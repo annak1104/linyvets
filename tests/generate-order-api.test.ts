@@ -5,7 +5,8 @@ import PizZip from "pizzip";
 import { describe, expect, it } from "vitest";
 
 import { POST } from "@/app/api/generate-order/route";
-import type { OrderForm } from "@/lib/order-form";
+import { orderLinesFromEstimate, type OrderForm } from "@/lib/order-form";
+import { parseAvk5Estimate } from "@/lib/avk5-parser";
 
 const sourcePath = resolve(process.cwd(), "reference/Кравчука.docx");
 
@@ -88,5 +89,16 @@ describe("POST /api/generate-order", () => {
       code: "INVALID_ORDER_DATA",
       message: "Перевірте обов’язкові поля перед формуванням DOCX.",
     });
+  });
+
+  it("accepts extracted items with source-only totals and nullable quantity/price", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/6_КД_ЗКР.rtf")));
+    const response = await POST(new Request("http://localhost/api/generate-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editedOrder, lines: orderLinesFromEstimate(parsed.data.items) }),
+    }));
+
+    expect(response.status).toBe(200);
   });
 });

@@ -59,7 +59,7 @@ test.describe("Лінивець complete workflow", () => {
     expect(xml).not.toContain("Кравчука");
     await expect(page.getByText("Крок 3 · Документ готовий")).toBeVisible();
     await expect(page.getByText(download.suggestedFilename())).toBeVisible();
-    await expect(page.getByText("Не додано")).toBeVisible();
+    await expect(page.getByText("8 позицій")).toBeVisible();
     await expect(page.getByText("12345,678 тис. грн")).toBeVisible();
     await page.screenshot({ path: saveScreenshotPath(`04-download-${testInfo.project.name}.png`), fullPage: true });
 

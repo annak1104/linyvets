@@ -14,12 +14,19 @@ describe("parseAvk5Estimate", () => {
     expect(result.data.finalEstimatedTotalThousandsUahText).toBe("197,271");
     expect(result.data.projectOrganization).toBeNull();
     expect(result.data.chiefProjectEngineer).toBe("Ігор ШЕВЧУК");
+    expect(result.data.items.length).toBeGreaterThan(1);
+    expect(new Set(result.data.items.map((item) => `${item.code}|${item.name}|${item.totalThousandsUah}`)).size).toBe(result.data.items.length);
+    expect(result.data.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "02-01", totalThousandsUah: 131.855, missingFields: ["unit", "quantity", "price"] }),
+    ]));
+    expect(result.data.itemsTotalThousandsUah).toBe(197.271);
 
     expect(result.verification).toEqual({
       status: "verified",
       summaryTotalThousandsUah: 197.271,
       estimateTableTotalThousandsUah: 197.271,
       explanatoryTotalThousandsUah: 197.271,
+      estimateItemsTotalThousandsUah: 197.271,
     });
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual(expect.arrayContaining([

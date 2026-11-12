@@ -4,6 +4,7 @@ export type Avk5EvidenceSection =
   | "project-name"
   | "approval-summary"
   | "estimate-table"
+  | "estimate-item"
   | "explanatory-summary"
   | "chief-engineer"
   | "organization-placeholder";
@@ -14,7 +15,9 @@ export type Avk5WarningCode =
   | "MISSING_PROJECT_ORGANIZATION"
   | "MISSING_CHIEF_PROJECT_ENGINEER"
   | "MISSING_APPROVAL_SUMMARY"
-  | "MISSING_ESTIMATE_TABLE_TOTAL";
+  | "MISSING_ESTIMATE_TABLE_TOTAL"
+  | "MISSING_ESTIMATE_ITEMS"
+  | "MISSING_ITEM_FIELD";
 
 export type Avk5ErrorCode = "INCONSISTENT_TOTALS";
 
@@ -32,6 +35,24 @@ export interface Avk5EstimateData {
   finalEstimatedTotalThousandsUahText: string | null;
   projectOrganization: string | null;
   chiefProjectEngineer: string | null;
+  items: Avk5EstimateItem[];
+  itemsTotalThousandsUah: number | null;
+}
+
+export type Avk5EstimateItemField = "unit" | "quantity" | "price";
+
+export interface Avk5EstimateItem {
+  id: string;
+  code: string | null;
+  name: string;
+  unit: string | null;
+  quantity: number | null;
+  price: number | null;
+  totalThousandsUah: number | null;
+  totalThousandsUahText: string | null;
+  sourceRowIndex: number;
+  sourceText: string;
+  missingFields: Avk5EstimateItemField[];
 }
 
 export interface Avk5TotalsVerification {
@@ -39,6 +60,7 @@ export interface Avk5TotalsVerification {
   summaryTotalThousandsUah: number | null;
   estimateTableTotalThousandsUah: number | null;
   explanatoryTotalThousandsUah: number | null;
+  estimateItemsTotalThousandsUah: number | null;
 }
 
 export interface Avk5Warning {
@@ -94,7 +116,7 @@ export async function parseAvk5Estimate(input: Buffer | Uint8Array | string): Pr
     throw new Avk5ParseError("EMPTY_RTF", "The RTF document contains no readable text.");
   }
 
-  return extractAvk5Data(paragraphs);
+  return extractAvk5Data(paragraphs, extractEstimateItems(normalizedRtf));
 }
 
 export function normalizeRtfForParser(input: Buffer | Uint8Array | string): string {
@@ -146,7 +168,7 @@ async function parseDocument(normalizedRtf: string): Promise<RtfDocument> {
   });
 }
 
-function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
+function extractAvk5Data(paragraphs: string[], items: Avk5EstimateItem[]): Avk5ParseResult {
   const evidence: Avk5Evidence[] = [];
   const warnings: Avk5Warning[] = [];
   const errors: Avk5Error[] = [];
@@ -176,6 +198,16 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
     evidence.push({ section: "chief-engineer", label: "Головний інженер проєкту", ...engineerMatch.evidence });
   }
 
+  for (const [index, item] of items.entries()) {
+    evidence.push({
+      section: "estimate-item",
+      label: `Позиція ${item.code ?? index + 1}`,
+      paragraphIndex: item.sourceRowIndex,
+      text: item.sourceText,
+      matchedText: item.sourceText,
+    });
+  }
+
   const organizationMatch = findExplicitOrganization(paragraphs);
   if (!organizationMatch) {
     const placeholder = findEvidence(paragraphs, (text) => text.includes("назва організації"));
@@ -184,7 +216,8 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
     }
   }
 
-  const totalCandidates = [summaryMatch?.value, estimateTableMatch?.value, explanatoryMatch?.value].filter((value): value is number => value !== undefined);
+  const itemsTotalThousandsUah = sumItemTotals(items);
+  const totalCandidates = [summaryMatch?.value, estimateTableMatch?.value, explanatoryMatch?.value, itemsTotalThousandsUah].filter((value): value is number => value !== undefined && value !== null);
   const uniqueTotals = [...new Set(totalCandidates)];
   const verificationStatus: Avk5TotalsVerification["status"] = uniqueTotals.length === 0
     ? "unavailable"
@@ -197,7 +230,7 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
   if (verificationStatus === "mismatch") {
     errors.push({
       code: "INCONSISTENT_TOTALS",
-      message: `The summary and estimate table totals do not agree: ${uniqueTotals.map(formatThousandsUah).join(", ")}.`,
+      message: `The source total sections do not agree: ${uniqueTotals.map(formatThousandsUah).join(", ")}.`,
       values: uniqueTotals,
     });
   }
@@ -208,6 +241,8 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
     finalEstimatedTotalThousandsUahText: summaryMatch?.sourceText ?? estimateTableMatch?.sourceText ?? explanatoryMatch?.sourceText ?? null,
     projectOrganization: organizationMatch?.value ?? null,
     chiefProjectEngineer: engineerMatch?.value ?? null,
+    items,
+    itemsTotalThousandsUah,
   };
 
   if (!data.projectName) warnings.push({ code: "MISSING_PROJECT_NAME", field: "projectName", message: "The AVK-5 project name was not found after the estimate title section." });
@@ -216,6 +251,16 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
   if (!estimateTableMatch) warnings.push({ code: "MISSING_ESTIMATE_TABLE_TOTAL", field: "verification", message: `The labeled estimate-table total “${ESTIMATE_TOTAL_LABEL}” was not found.` });
   if (!data.projectOrganization) warnings.push({ code: "MISSING_PROJECT_ORGANIZATION", field: "projectOrganization", message: "The source contains an organization placeholder but does not name a project organization explicitly." });
   if (!data.chiefProjectEngineer) warnings.push({ code: "MISSING_CHIEF_PROJECT_ENGINEER", field: "chiefProjectEngineer", message: "The chief project engineer was not found." });
+  if (!items.length) warnings.push({ code: "MISSING_ESTIMATE_ITEMS", field: "items", message: "No separate estimate items were found in the source table." });
+  for (const item of items) {
+    if (item.missingFields.length > 0) {
+      warnings.push({
+        code: "MISSING_ITEM_FIELD",
+        field: "items",
+        message: `Estimate item ${item.code ?? item.name} is missing: ${item.missingFields.join(", ")}.`,
+      });
+    }
+  }
 
   return {
     data,
@@ -227,8 +272,173 @@ function extractAvk5Data(paragraphs: string[]): Avk5ParseResult {
       summaryTotalThousandsUah: summaryMatch?.value ?? null,
       estimateTableTotalThousandsUah: estimateTableMatch?.value ?? null,
       explanatoryTotalThousandsUah: explanatoryMatch?.value ?? null,
+      estimateItemsTotalThousandsUah: itemsTotalThousandsUah,
     },
   };
+}
+
+function extractEstimateItems(normalizedRtf: string): Avk5EstimateItem[] {
+  const items: Avk5EstimateItem[] = [];
+  const seen = new Set<string>();
+  const rows = normalizedRtf.split(/\\trowd\b/).slice(1);
+
+  for (const [rowIndex, rowChunk] of rows.entries()) {
+    const row = rowChunk.split(/\\row\b/, 1)[0];
+    const contentStart = row.indexOf("\\pard");
+    if (contentStart < 0) continue;
+
+    // AVK-5 uses both {\cell } and formatted cells such as
+    // {\f1\fs16  \cell}; split at the control word, not at the wrapper.
+    const rawCells = row.slice(contentStart).split(/\\cell\b/).slice(0, -1);
+    if (rawCells.length < 7) continue;
+    const cells = rawCells.map(decodeRtfFragment);
+    const itemNumber = cells[0].match(/^\d+$/)?.[0] ?? String(items.length + 1);
+    const code = cells[1] || null;
+    const name = cells[2] || "";
+    const totalIndex = cells.length - 1;
+    const totalText = cells[totalIndex] || "";
+    if (!code || !name || !parseTableAmount(totalText)) continue;
+
+    const dedupeKey = `${code}\u0000${name}\u0000${totalText}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const totalThousandsUah = parseTableAmount(totalText);
+    const sourceValues = inferItemSourceValues(cells);
+    items.push({
+      id: `estimate-${rowIndex}-${itemNumber}`,
+      code,
+      name,
+      unit: sourceValues.unit,
+      quantity: sourceValues.quantity,
+      price: sourceValues.price,
+      totalThousandsUah,
+      totalThousandsUahText: totalText,
+      sourceRowIndex: rowIndex,
+      sourceText: cells.slice(1).join(" | "),
+      missingFields: (["unit", "quantity", "price"] as const).filter((field) => sourceValues[field] === null),
+    });
+  }
+
+  return items;
+}
+
+function inferItemSourceValues(cells: string[]): {
+  unit: string | null;
+  quantity: number | null;
+  price: number | null;
+} {
+  const candidateUnit = cells[3] || "";
+  const hasExplicitUnit = candidateUnit.length > 0 && candidateUnit !== "-" && parseDecimalValue(candidateUnit) === null;
+  if (hasExplicitUnit) {
+    return {
+      unit: candidateUnit,
+      quantity: parseDecimalValue(cells[4]),
+      price: parseDecimalValue(cells[5]),
+    };
+  }
+
+  return {
+    // The consolidated table labels monetary columns as “тис. грн”, but it
+    // does not provide a per-item unit. Keep the item unit missing rather than
+    // turning the table's currency measure into an invented unit.
+    unit: null,
+    quantity: null,
+    price: null,
+  };
+}
+
+function decodeRtfFragment(fragment: string): string {
+  const bytes: number[] = [];
+  const parts: string[] = [];
+  const flushBytes = () => {
+    if (bytes.length > 0) {
+      parts.push(new TextDecoder("windows-1251").decode(Uint8Array.from(bytes)));
+      bytes.length = 0;
+    }
+  };
+
+  for (let index = 0; index < fragment.length;) {
+    const character = fragment[index];
+    if (character === "{") {
+      index += 1;
+      continue;
+    }
+    if (character === "}") {
+      index += 1;
+      continue;
+    }
+    if (character !== "\\") {
+      bytes.push(fragment.charCodeAt(index));
+      index += 1;
+      continue;
+    }
+
+    const next = fragment[index + 1];
+    if (next === "'") {
+      const hex = fragment.slice(index + 2, index + 4);
+      if (/^[0-9a-f]{2}$/i.test(hex)) bytes.push(Number.parseInt(hex, 16));
+      index += 4;
+      continue;
+    }
+    if (next === "u") {
+      const match = fragment.slice(index).match(/^\\u(-?\d+)\??/);
+      if (match) {
+        flushBytes();
+        const codePoint = Number(match[1]);
+        parts.push(String.fromCharCode(codePoint < 0 ? codePoint + 65536 : codePoint));
+        index += match[0].length;
+        continue;
+      }
+    }
+    if (next === "~") {
+      bytes.push(0xa0);
+      index += 2;
+      continue;
+    }
+    if (next === "-" || next === "_") {
+      if (next === "_") bytes.push(0x2d);
+      index += 2;
+      continue;
+    }
+    if (next === "\\" || next === "{" || next === "}") {
+      bytes.push(next.charCodeAt(0));
+      index += 2;
+      continue;
+    }
+
+    const control = fragment.slice(index).match(/^\\([a-z]+)(-?\d+)? ?/i);
+    if (control) {
+      if (control[1].toLowerCase() === "par" || control[1].toLowerCase() === "line" || control[1].toLowerCase() === "tab") {
+        bytes.push(0x20);
+      }
+      index += control[0].length;
+      continue;
+    }
+    index += 1;
+  }
+
+  flushBytes();
+  return collapseWhitespace(parts.join(""));
+}
+
+function parseTableAmount(value: string): number | null {
+  if (!value || value === "-") return null;
+  const match = value.match(/\d{1,3}(?:[ .]\d{3})*[.,]\d{3}/);
+  return match ? parseThousandsUah(match[0]) : null;
+}
+
+function parseDecimalValue(value: string | undefined): number | null {
+  if (!value || value === "-") return null;
+  const normalized = value.replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sumItemTotals(items: Avk5EstimateItem[]): number | null {
+  if (items.length === 0 || items.some((item) => item.totalThousandsUah === null)) return null;
+  return Number(items.reduce((sum, item) => sum + (item.totalThousandsUah ?? 0), 0).toFixed(3));
 }
 
 function findProjectName(paragraphs: string[]) {

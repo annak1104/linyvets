@@ -26,6 +26,8 @@ describe("POST /api/parse-estimate", () => {
     expect(body.result.data.projectName).toContain("Поточний ремонт проїзду");
     expect(body.result.data.finalEstimatedTotalThousandsUahText).toBe("197,271");
     expect(body.result.data.chiefProjectEngineer).toBe("Ігор ШЕВЧУК");
+    expect(body.result.data.items.length).toBe(8);
+    expect(body.result.data.itemsTotalThousandsUah).toBe(197.271);
     expect(body.result.verification.status).toBe("verified");
     expect(body.result.evidence.length).toBeGreaterThan(0);
   });

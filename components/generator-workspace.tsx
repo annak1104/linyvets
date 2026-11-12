@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
-import { buildOrderParagraphs, emptyOrderValues, orderSchema, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, emptyOrderValues, orderLinesFromEstimate, orderSchema, type OrderForm } from "@/lib/order-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,7 +50,7 @@ export function GeneratorWorkspace() {
     defaultValues: emptyOrderValues,
     mode: "onBlur",
   });
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: "lines" });
+  const { fields } = useFieldArray({ control: form.control, name: "lines" });
   const watchedLines = form.watch("lines");
   const watchedEstimatedAmount = form.watch("estimatedAmountThousandsUah");
   const total = watchedLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.price) || 0), 0);
@@ -90,6 +90,7 @@ export function GeneratorWorkspace() {
         chiefProjectEngineer: result.data.chiefProjectEngineer ?? "",
         estimatedAmountThousandsUah: amountText,
         estimatedAmountInWords: amountText ? amountInWordsUkrainian(amountText) : "",
+        lines: orderLinesFromEstimate(result.data.items),
       };
       form.reset({ ...nextValues, ...buildOrderParagraphs(nextValues) });
       setParseResult(result);
@@ -202,13 +203,11 @@ export function GeneratorWorkspace() {
             <ReviewEditStep
               fields={fields}
               form={form}
-              total={total}
               parseResult={parseResult}
               isGenerating={isGenerating}
               selectedFile={selectedFile}
               onBack={() => setStep(1)}
-              onAdd={() => append({ id: crypto.randomUUID(), name: "", unit: "шт.", quantity: 1, price: 0 })}
-              onRemove={remove}
+              onInvalid={() => setErrorMessage("Перевірте обов’язкові поля перед формуванням документа.")}
               onSubmit={handleGenerate}
             />
           )}

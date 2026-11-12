@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import type { FieldArrayWithId, UseFormReturn } from "react-hook-form";
+import type { FieldArrayWithId, FieldErrors, UseFormReturn } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import {
   ArrowLeft,
@@ -11,8 +11,6 @@ import {
   FileSpreadsheet,
   Info,
   LoaderCircle,
-  Minus,
-  Plus,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
@@ -29,29 +27,23 @@ import { Textarea } from "@/components/ui/textarea";
 type ReviewEditStepProps = {
   fields: FieldArrayWithId<OrderForm, "lines", "id">[];
   form: UseFormReturn<OrderForm>;
-  total: number;
   parseResult: Avk5ParseResult | null;
   isGenerating: boolean;
   selectedFile: File | null;
   onBack: () => void;
-  onAdd: () => void;
-  onRemove: (index: number) => void;
   onSubmit: (values: OrderForm) => Promise<void>;
+  onInvalid?: (errors: FieldErrors<OrderForm>) => void;
 };
-
-const money = new Intl.NumberFormat("uk-UA", { style: "currency", currency: "UAH", maximumFractionDigits: 0 });
 
 export function ReviewEditStep({
   fields,
   form,
-  total,
   parseResult,
   isGenerating,
   selectedFile,
   onBack,
-  onAdd,
-  onRemove,
   onSubmit,
+  onInvalid,
 }: ReviewEditStepProps) {
   const values = useWatch({ control: form.control }) as OrderForm;
   const amount = useWatch({ control: form.control, name: "estimatedAmountThousandsUah" });
@@ -107,7 +99,7 @@ export function ReviewEditStep({
   }, [form, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
+    <form noValidate onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.82fr)]">
         <Card className="overflow-hidden">
           <div className="border-b p-6 sm:p-8">
@@ -173,28 +165,34 @@ export function ReviewEditStep({
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h3 id="positions-heading" className="text-sm font-semibold">Позиції замовлення</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{fields.length ? `${fields.length} позиції` : "Не витягувалися з RTF"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{fields.length ? `${fields.length} позицій із кошторису` : "У кошторисі окремих позицій не знайдено"}</p>
                 </div>
-                <Button type="button" variant="outline" className="h-9 px-3 text-xs" onClick={onAdd}><Plus className="size-3.5" /> Додати позицію</Button>
               </div>
               <div className="overflow-hidden rounded-2xl border">
-                <div className="hidden grid-cols-[minmax(0,1fr)_68px_86px_105px_40px] gap-3 bg-background px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:grid"><span>Найменування</span><span>Од.</span><span>К-сть</span><span>Ціна, ₴</span><span /></div>
+                <div className="hidden grid-cols-[minmax(0,1fr)_68px_86px_125px] gap-3 bg-background px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:grid"><span>Найменування</span><span>Од.</span><span>К-сть</span><span>Ціна, тис. грн</span></div>
                 <div className="divide-y">
-                  {fields.map((field, index) => <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_68px_86px_105px_40px] sm:items-center" key={field.id}>
-                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Найменування</span><Input className="h-10" {...form.register(`lines.${index}.name`)} /></label>
+                  {fields.map((field, index) => <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_68px_86px_125px] sm:items-center" key={field.id}>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {field.code && <Badge className="bg-background font-mono text-[10px]">{field.code}</Badge>}
+                        <span className="text-[11px] text-muted-foreground">Дані з кошторису</span>
+                      </div>
+                      <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Найменування</span><Input className="h-10" {...form.register(`lines.${index}.name`)} /></label>
+                    </div>
                     <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Од.</span><Input className="h-10" {...form.register(`lines.${index}.unit`)} /></label>
-                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">К-сть</span><Input className="h-10" type="number" step="any" {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} /></label>
-                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Ціна, ₴</span><Input className="h-10" type="number" step="any" {...form.register(`lines.${index}.price`, { valueAsNumber: true })} /></label>
-                    <Button type="button" variant="ghost" className="h-9 w-9 justify-self-end p-0 text-muted-foreground hover:text-primary-hover" aria-label={`Видалити ${field.name || "позицію"}`} onClick={() => onRemove(index)}><Minus className="size-4" /></Button>
+                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">К-сть</span><Input className="h-10" type="number" step="any" placeholder="Не зазначено" {...form.register(`lines.${index}.quantity`, { setValueAs: (value) => value == null || value === "" ? null : Number(value) })} /></label>
+                    <div className="space-y-2"><label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Ціна, тис. грн</span><Input className="h-10" type="number" step="any" placeholder="Не зазначено" {...form.register(`lines.${index}.price`, { setValueAs: (value) => value == null || value === "" ? null : Number(value) })} /></label><p className="text-[11px] leading-4 text-muted-foreground">У кошторисі: {field.sourceTotalThousandsUah ? `${field.sourceTotalThousandsUah} тис. грн` : "не зазначено"}</p></div>
+                    {field.sourceMissingFields.length > 0 && <p className="col-span-full rounded-xl bg-cream px-3 py-2 text-xs leading-5 text-foreground">У джерелі не зазначено: {field.sourceMissingFields.map(itemFieldLabel).join(", ")}. Поля залишено порожніми — їх можна уточнити перед формуванням.</p>}
+                    {form.formState.errors.lines?.[index] && <p className="col-span-full text-xs font-normal text-primary-hover">{form.formState.errors.lines[index]?.name?.message ?? form.formState.errors.lines[index]?.unit?.message ?? form.formState.errors.lines[index]?.quantity?.message ?? form.formState.errors.lines[index]?.price?.message}</p>}
                   </div>)}
                 </div>
               </div>
-              {fields.length === 0 && <p className="mt-3 rounded-xl bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">Окремі позиції не витягувалися з RTF. Додайте їх вручну, якщо вони потрібні для документа.</p>}
+              {fields.length === 0 && <p className="mt-3 rounded-xl bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">У завантаженому кошторисі окремі позиції не знайдено. Нові позиції не додаються вручну, щоб не змінювати дані джерела.</p>}
             </section>
 
             <div className="grid gap-5 sm:grid-cols-[1fr_240px] sm:items-end">
               <Field label="Примітка"><Textarea {...form.register("note")} placeholder="Необов’язково" /></Field>
-              <div className="rounded-2xl bg-accent p-5"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Сума позицій</p><p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{money.format(total)}</p><p className="mt-1 text-xs text-muted-foreground">для доданих вручну позицій</p></div>
+              <div className="rounded-2xl bg-accent p-5"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Сума з кошторису</p><p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{parseResult?.data.itemsTotalThousandsUah === null || parseResult?.data.itemsTotalThousandsUah === undefined ? "—" : `${parseResult.data.itemsTotalThousandsUah.toLocaleString("uk-UA", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} тис.`}</p><p className="mt-1 text-xs text-muted-foreground">Редагування полів не змінює файл-джерело</p></div>
             </div>
 
             <div className="flex items-start gap-2 rounded-xl bg-background px-3 py-2.5 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-3.5 shrink-0 text-primary-hover" />Відредаговані значення зберігаються під час переходу між кроками.</div>
@@ -238,7 +236,7 @@ function OrderPreview({ values }: { values: OrderForm }) {
 
 function ParseResultBanner({ result }: { result: Avk5ParseResult }) {
   const hasErrors = result.errors.length > 0;
-  const warningMessages = result.warnings.map((warning) => warningMessage(warning.code));
+  const warningMessages = [...new Set(result.warnings.map((warning) => warningMessage(warning.code)))];
 
   return (
     <div className="border-b px-6 py-5 sm:px-8" role="status" aria-live="polite">
@@ -266,8 +264,14 @@ function warningMessage(code: Avk5ParseResult["warnings"][number]["code"]): stri
     MISSING_CHIEF_PROJECT_ENGINEER: "Головного інженера проєкту не знайдено.",
     MISSING_APPROVAL_SUMMARY: "Не знайдено підсумок у блоці затвердження.",
     MISSING_ESTIMATE_TABLE_TOTAL: "Не знайдено підсумок таблиці кошторису.",
+    MISSING_ESTIMATE_ITEMS: "Окремі позиції кошторису не знайдено — список залишено порожнім.",
+    MISSING_ITEM_FIELD: "Для частини позицій у джерелі відсутні кількість або ціна — поля залишено порожніми.",
   };
   return messages[code];
+}
+
+function itemFieldLabel(field: string): string {
+  return { unit: "одиницю виміру", quantity: "кількість", price: "ціну" }[field] ?? field;
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
