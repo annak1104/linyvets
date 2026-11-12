@@ -1,0 +1,10 @@
+{
+  "name": "Лінивець — генератор AVK-5",
+  "short_name": "Лінивець",
+  "lang": "uk",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F9FC",
+  "theme_color": "#EAF5FC",
+  "icons": [{ "src": "/icon.svg", "sizes": "112x88", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

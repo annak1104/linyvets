@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f9fc;
+  --foreground: #234a63;
+  --muted-foreground: #6c8799;
+  --border: #dceaf3;
+  --card: #ffffff;
+  --primary: #6daed6;
+  --primary-hover: #508fb7;
+  --accent: #eaf5fc;
+  --cream: #fff6e9;
+  --success: #16856a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-cream: var(--cream);
+  --color-success: var(--success);
+  --font-sans: "Avenir Next", Avenir, "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--background);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: var(--primary);
+  color: white;
+}
+
+.soft-shadow {
+  box-shadow: 0 24px 70px rgba(35, 74, 99, 0.08), 0 4px 14px rgba(35, 74, 99, 0.03);
+}
+
+.surface-shadow {
+  box-shadow: 0 12px 32px rgba(35, 74, 99, 0.06), 0 2px 8px rgba(35, 74, 99, 0.025);
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(109, 174, 214, 0.45);
+  outline-offset: 3px;
+}
