@@ -1,21 +1,8 @@
 import { z } from "zod";
 
-import type { Avk5EstimateItem } from "@/lib/avk5-parser";
 import { parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
 
 export const DEFAULT_ORDER_PARAGRAPH = "Затвердити зведений кошторис вартості робіт (робочий проєкт):";
-
-const lineSchema = z.object({
-  id: z.string(),
-  code: z.string(),
-  name: z.string().min(1, "Вкажіть назву позиції"),
-  unit: z.string(),
-  quantity: z.number().positive("Кількість має бути більшою за 0").nullable(),
-  price: z.number().nonnegative("Ціна не може бути від’ємною").nullable(),
-  sourceTotalThousandsUah: z.string(),
-  sourceText: z.string(),
-  sourceMissingFields: z.array(z.string()),
-});
 
 const amountSchema = z.string()
   .trim()
@@ -40,12 +27,9 @@ export const orderSchema = z.object({
   orderParagraph2: z.string(),
   orderParagraph3: z.string(),
   orderParagraph4: z.string(),
-  note: z.string(),
-  lines: z.array(lineSchema),
 });
 
 export type OrderForm = z.infer<typeof orderSchema>;
-export type OrderLineForm = OrderForm["lines"][number];
 
 export const emptyOrderValues: OrderForm = {
   projectName: "",
@@ -58,23 +42,7 @@ export const emptyOrderValues: OrderForm = {
   orderParagraph2: "",
   orderParagraph3: "",
   orderParagraph4: "",
-  note: "",
-  lines: [],
 };
-
-export function orderLinesFromEstimate(items: Avk5EstimateItem[]): OrderLineForm[] {
-  return items.map((item) => ({
-    id: item.id,
-    code: item.code ?? "",
-    name: item.name,
-    unit: item.unit ?? "",
-    quantity: item.quantity,
-    price: item.price,
-    sourceTotalThousandsUah: item.totalThousandsUahText ?? "",
-    sourceText: item.sourceText,
-    sourceMissingFields: item.missingFields,
-  }));
-}
 
 export type OrderParagraphValues = Pick<OrderForm, "orderParagraph1" | "orderParagraph2" | "orderParagraph3" | "orderParagraph4">;
 

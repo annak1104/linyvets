@@ -5,10 +5,12 @@ import PizZip from "pizzip";
 import { describe, expect, it } from "vitest";
 
 import { POST } from "@/app/api/generate-order/route";
-import { orderLinesFromEstimate, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, type OrderForm } from "@/lib/order-form";
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
+import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 
 const sourcePath = resolve(process.cwd(), "reference/Кравчука.docx");
+const localEstimatePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
 
 const editedOrder: OrderForm = {
   projectName: "Новий проєкт / об’єкт: 2026",
@@ -21,8 +23,6 @@ const editedOrder: OrderForm = {
   orderParagraph2: "Новий проєкт / об’єкт: 2026\nдодатковий рядок абзацу в наказі;",
   orderParagraph3: "Проєктна організація: ТОВ «Нова організація»",
   orderParagraph4: "Головний інженер проєкту - Ігор ШЕВЧУК (сертифікат серії АР № 999999).\nДодаткова примітка.",
-  note: "Редаговано користувачем",
-  lines: [],
 };
 
 function sha256(value: Buffer): string {
@@ -36,6 +36,31 @@ function packagePart(buffer: Buffer, name: string): Buffer {
 }
 
 describe("POST /api/generate-order", () => {
+  it("uses the real local-estimate values when generating the official DOCX", async () => {
+    const estimate = await parseAvk5Estimate(readFileSync(localEstimatePath));
+    const values: OrderForm = {
+      ...editedOrder,
+      projectName: estimate.data.projectName ?? "",
+      projectOrganization: estimate.data.projectOrganization ?? "",
+      chiefProjectEngineer: estimate.data.chiefProjectEngineer ?? "",
+      estimatedAmountThousandsUah: estimate.data.finalEstimatedTotalThousandsUahText ?? "",
+      estimatedAmountInWords: amountInWordsUkrainian(estimate.data.finalEstimatedTotalThousandsUahText ?? ""),
+    };
+    const response = await POST(new Request("http://localhost/api/generate-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    }));
+    const xml = packagePart(Buffer.from(await response.arrayBuffer()), "word/document.xml").toString("utf8");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("Поточний ремонт вулиці Ветеранів в місті Луцьку Волинської області");
+    expect(xml).toContain("144,079");
+    expect(xml).toContain("Сто сорок чотири тисячі сімдесят дев’ять грн 00 коп.");
+    expect(xml).not.toContain("Кравчука");
+    expect(xml).not.toContain("{{");
+  });
+
   it("generates a valid DOCX from final edited values with preserved template structure", async () => {
     const response = await POST(new Request("http://localhost/api/generate-order", {
       method: "POST",
@@ -91,14 +116,36 @@ describe("POST /api/generate-order", () => {
     });
   });
 
-  it("accepts extracted items with source-only totals and nullable quantity/price", async () => {
-    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/6_КД_ЗКР.rtf")));
+  it("generates DOCX from the second source fixture without reusing the first project", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/10_КД_ЗКР.rtf")));
+    const amountText = parsed.data.finalEstimatedTotalThousandsUahText ?? "";
+    const values = {
+      ...editedOrder,
+      projectName: parsed.data.projectName ?? "",
+      estimatedAmountThousandsUah: amountText,
+      estimatedAmountInWords: amountInWordsUkrainian(amountText),
+      chiefProjectEngineer: parsed.data.chiefProjectEngineer ?? "",
+      ...buildOrderParagraphs({
+        projectName: parsed.data.projectName ?? "",
+        estimatedAmountThousandsUah: amountText,
+        estimatedAmountInWords: amountInWordsUkrainian(amountText),
+        projectOrganization: parsed.data.projectOrganization ?? "",
+        chiefProjectEngineer: parsed.data.chiefProjectEngineer ?? "",
+        certificate: "",
+      }),
+    } satisfies OrderForm;
+
     const response = await POST(new Request("http://localhost/api/generate-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editedOrder, lines: orderLinesFromEstimate(parsed.data.items) }),
+      body: JSON.stringify(values),
     }));
+    const document = Buffer.from(await response.arrayBuffer());
+    const xml = packagePart(document, "word/document.xml").toString("utf8");
 
     expect(response.status).toBe(200);
+    expect(xml).toContain("Поточний ремонт вулиці Іова Кондзелевича");
+    expect(xml).toContain("215,007");
+    expect(xml).not.toContain("Поточний ремонт проїзду до будинку");
   });
 });

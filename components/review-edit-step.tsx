@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import type { FieldArrayWithId, FieldErrors, UseFormReturn } from "react-hook-form";
+import type { FieldErrors, UseFormReturn } from "react-hook-form";
 import { useWatch } from "react-hook-form";
 import {
   ArrowLeft,
@@ -25,7 +25,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 type ReviewEditStepProps = {
-  fields: FieldArrayWithId<OrderForm, "lines", "id">[];
   form: UseFormReturn<OrderForm>;
   parseResult: Avk5ParseResult | null;
   isGenerating: boolean;
@@ -36,7 +35,6 @@ type ReviewEditStepProps = {
 };
 
 export function ReviewEditStep({
-  fields,
   form,
   parseResult,
   isGenerating,
@@ -125,19 +123,19 @@ export function ReviewEditStep({
                 <p className="mt-1 text-xs text-muted-foreground">Відсутні у джерелі значення залишено порожніми.</p>
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Назва проєкту" error={form.formState.errors.projectName?.message}>
+                <Field label="Назва проєкту" hint={fieldStateHint(parseResult?.data.projectName, Boolean(form.formState.dirtyFields.projectName))} error={form.formState.errors.projectName?.message}>
                   <Input {...form.register("projectName")} aria-invalid={Boolean(form.formState.errors.projectName)} />
                 </Field>
-                <Field label="Сума, тис. грн" error={form.formState.errors.estimatedAmountThousandsUah?.message}>
+                <Field label="Сума, тис. грн" hint={fieldStateHint(parseResult?.data.finalEstimatedTotalThousandsUah, Boolean(form.formState.dirtyFields.estimatedAmountThousandsUah))} error={form.formState.errors.estimatedAmountThousandsUah?.message}>
                   <Input {...form.register("estimatedAmountThousandsUah")} inputMode="decimal" placeholder="197,271" aria-invalid={Boolean(form.formState.errors.estimatedAmountThousandsUah)} />
                 </Field>
-                <Field label="Проєктна організація">
+                <Field label="Проєктна організація" hint={fieldStateHint(parseResult?.data.projectOrganization, Boolean(form.formState.dirtyFields.projectOrganization))}>
                   <Input {...form.register("projectOrganization")} placeholder="Не зазначено у джерелі" />
                 </Field>
-                <Field label="Головний інженер проєкту">
+                <Field label="Головний інженер проєкту" hint={fieldStateHint(parseResult?.data.chiefProjectEngineer, Boolean(form.formState.dirtyFields.chiefProjectEngineer))}>
                   <Input {...form.register("chiefProjectEngineer")} placeholder="Не знайдено" />
                 </Field>
-                <Field label="Сертифікат">
+                <Field label="Сертифікат" hint={fieldStateHint(null, Boolean(form.formState.dirtyFields.certificate))}>
                   <Input {...form.register("certificate")} placeholder="Не зазначено у джерелі" />
                 </Field>
                 <Field label="Сума українською" hint="Перераховується автоматично">
@@ -160,40 +158,6 @@ export function ReviewEditStep({
                 <Field label="Абзац 4 · інженер"><Textarea className="min-h-20" {...form.register("orderParagraph4")} placeholder="Залишено порожнім, якщо даних немає" /></Field>
               </div>
             </section>
-
-            <section aria-labelledby="positions-heading">
-              <div className="mb-3 flex items-end justify-between gap-3">
-                <div>
-                  <h3 id="positions-heading" className="text-sm font-semibold">Позиції замовлення</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">{fields.length ? `${fields.length} позицій із кошторису` : "У кошторисі окремих позицій не знайдено"}</p>
-                </div>
-              </div>
-              <div className="overflow-hidden rounded-2xl border">
-                <div className="hidden grid-cols-[minmax(0,1fr)_68px_86px_125px] gap-3 bg-background px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:grid"><span>Найменування</span><span>Од.</span><span>К-сть</span><span>Ціна, тис. грн</span></div>
-                <div className="divide-y">
-                  {fields.map((field, index) => <div className="grid gap-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_68px_86px_125px] sm:items-center" key={field.id}>
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {field.code && <Badge className="bg-background font-mono text-[10px]">{field.code}</Badge>}
-                        <span className="text-[11px] text-muted-foreground">Дані з кошторису</span>
-                      </div>
-                      <label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Найменування</span><Input className="h-10" {...form.register(`lines.${index}.name`)} /></label>
-                    </div>
-                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Од.</span><Input className="h-10" {...form.register(`lines.${index}.unit`)} /></label>
-                    <label className="space-y-1 sm:space-y-0"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">К-сть</span><Input className="h-10" type="number" step="any" placeholder="Не зазначено" {...form.register(`lines.${index}.quantity`, { setValueAs: (value) => value == null || value === "" ? null : Number(value) })} /></label>
-                    <div className="space-y-2"><label className="block space-y-1"><span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:sr-only">Ціна, тис. грн</span><Input className="h-10" type="number" step="any" placeholder="Не зазначено" {...form.register(`lines.${index}.price`, { setValueAs: (value) => value == null || value === "" ? null : Number(value) })} /></label><p className="text-[11px] leading-4 text-muted-foreground">У кошторисі: {field.sourceTotalThousandsUah ? `${field.sourceTotalThousandsUah} тис. грн` : "не зазначено"}</p></div>
-                    {field.sourceMissingFields.length > 0 && <p className="col-span-full rounded-xl bg-cream px-3 py-2 text-xs leading-5 text-foreground">У джерелі не зазначено: {field.sourceMissingFields.map(itemFieldLabel).join(", ")}. Поля залишено порожніми — їх можна уточнити перед формуванням.</p>}
-                    {form.formState.errors.lines?.[index] && <p className="col-span-full text-xs font-normal text-primary-hover">{form.formState.errors.lines[index]?.name?.message ?? form.formState.errors.lines[index]?.unit?.message ?? form.formState.errors.lines[index]?.quantity?.message ?? form.formState.errors.lines[index]?.price?.message}</p>}
-                  </div>)}
-                </div>
-              </div>
-              {fields.length === 0 && <p className="mt-3 rounded-xl bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">У завантаженому кошторисі окремі позиції не знайдено. Нові позиції не додаються вручну, щоб не змінювати дані джерела.</p>}
-            </section>
-
-            <div className="grid gap-5 sm:grid-cols-[1fr_240px] sm:items-end">
-              <Field label="Примітка"><Textarea {...form.register("note")} placeholder="Необов’язково" /></Field>
-              <div className="rounded-2xl bg-accent p-5"><p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Сума з кошторису</p><p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{parseResult?.data.itemsTotalThousandsUah === null || parseResult?.data.itemsTotalThousandsUah === undefined ? "—" : `${parseResult.data.itemsTotalThousandsUah.toLocaleString("uk-UA", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} тис.`}</p><p className="mt-1 text-xs text-muted-foreground">Редагування полів не змінює файл-джерело</p></div>
-            </div>
 
             <div className="flex items-start gap-2 rounded-xl bg-background px-3 py-2.5 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-3.5 shrink-0 text-primary-hover" />Відредаговані значення зберігаються під час переходу між кроками.</div>
           </div>
@@ -235,8 +199,9 @@ function OrderPreview({ values }: { values: OrderForm }) {
 }
 
 function ParseResultBanner({ result }: { result: Avk5ParseResult }) {
-  const hasErrors = result.errors.length > 0;
-  const warningMessages = [...new Set(result.warnings.map((warning) => warningMessage(warning.code)))];
+  const hasErrors = result.errors.length > 0 || result.extractionStatus !== "extracted";
+  const warningMessages = [...new Set(result.warnings.filter((warning) => !warning.code.includes("ITEM")).map((warning) => warningMessage(warning.code)))];
+  const visibleEvidence = result.evidence.filter((item) => !["estimate-item", "estimate-number", "prepared-by"].includes(item.section));
 
   return (
     <div className="border-b px-6 py-5 sm:px-8" role="status" aria-live="polite">
@@ -245,12 +210,13 @@ function ParseResultBanner({ result }: { result: Avk5ParseResult }) {
           {hasErrors ? <TriangleAlert className="mt-0.5 size-5 shrink-0 text-primary-hover" /> : <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />}
           <div className="min-w-0">
             <p className="text-sm font-semibold">{hasErrors ? "Кошторис прочитано, але потрібна перевірка" : "Кошторис успішно прочитано"}</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Дані витягнуто з RTF у пам’яті. Перевірте поля перед формуванням документа.</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">RTF декодовано у пам’яті. Статус вилучення: {extractionStatusLabel(result.extractionStatus)}.</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Тип документа: <span className="font-medium text-foreground">{documentTypeLabel(result.data.documentType)}</span></p>
             {warningMessages.length > 0 && <ul className="mt-3 space-y-1 text-xs text-foreground">{warningMessages.map((message) => <li key={message}>• {message}</li>)}</ul>}
             {result.errors.length > 0 && <p className="mt-3 text-xs font-medium text-primary-hover">Підсумки у джерелі не збігаються — перевірте суму.</p>}
           </div>
         </div>
-        {result.evidence.length > 0 && <details className="mt-4 border-t border-current/10 pt-3 text-xs"><summary className="cursor-pointer font-semibold">Показати джерело витягнутих даних</summary><ul className="mt-2 space-y-1.5 text-muted-foreground">{result.evidence.map((item) => <li key={`${item.section}-${item.paragraphIndex}`}><span className="font-medium text-foreground">{item.label}:</span> {item.matchedText ?? item.text}</li>)}</ul></details>}
+        {visibleEvidence.length > 0 && <details className="mt-4 border-t border-current/10 pt-3 text-xs"><summary className="cursor-pointer font-semibold">Показати джерело реквізитів наказу</summary><ul className="mt-2 space-y-1.5 text-muted-foreground">{visibleEvidence.map((item) => <li key={`${item.section}-${item.paragraphIndex}`}><span className="font-medium text-foreground">{item.label}:</span> {item.matchedText ?? item.text}</li>)}</ul></details>}
       </div>
     </div>
   );
@@ -266,12 +232,31 @@ function warningMessage(code: Avk5ParseResult["warnings"][number]["code"]): stri
     MISSING_ESTIMATE_TABLE_TOTAL: "Не знайдено підсумок таблиці кошторису.",
     MISSING_ESTIMATE_ITEMS: "Окремі позиції кошторису не знайдено — список залишено порожнім.",
     MISSING_ITEM_FIELD: "Для частини позицій у джерелі відсутні кількість або ціна — поля залишено порожніми.",
+    AMBIGUOUS_FINAL_TOTAL: "У джерелі знайдено суперечливі фінальні суми — виберіть правильну вручну.",
+    MISSING_ESTIMATE_NUMBER: "Номер кошторису не знайдено у заголовку документа.",
+    MISSING_PREPARED_BY: "Підписанта або укладача кошторису не знайдено.",
+    UNSUPPORTED_DOCUMENT_TYPE: "RTF прочитано, але тип AVK-5 документа не розпізнано.",
   };
   return messages[code];
 }
 
-function itemFieldLabel(field: string): string {
-  return { unit: "одиницю виміру", quantity: "кількість", price: "ціну" }[field] ?? field;
+function extractionStatusLabel(status: Avk5ParseResult["extractionStatus"]): string {
+  return { extracted: "дані вилучено", partial: "дані вилучено частково", unsupported: "тип документа не розпізнано" }[status];
+}
+
+function documentTypeLabel(type: Avk5ParseResult["data"]["documentType"]): string {
+  return {
+    "local-estimate": "локальний кошторис",
+    "object-estimate": "об’єктний кошторис",
+    "consolidated-estimate": "зведений кошторис",
+    "resource-estimate": "ресурсний кошторис",
+    unknown: "невідомий AVK-5 документ",
+  }[type];
+}
+
+function fieldStateHint(sourceValue: string | number | null | undefined, edited: boolean): string {
+  if (edited) return "змінено вручну";
+  return sourceValue === null || sourceValue === undefined || sourceValue === "" ? "не знайдено у джерелі" : "знайдено у джерелі";
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {

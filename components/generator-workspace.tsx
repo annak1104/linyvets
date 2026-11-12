@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import {
   ArrowLeft,
   Check,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
-import { buildOrderParagraphs, emptyOrderValues, orderLinesFromEstimate, orderSchema, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, emptyOrderValues, orderSchema, type OrderForm } from "@/lib/order-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,8 +33,6 @@ type ParseEstimateResponse =
   | { result: Avk5ParseResult }
   | { error: { code: string; message: string } };
 
-const money = new Intl.NumberFormat("uk-UA", { style: "currency", currency: "UAH", maximumFractionDigits: 0 });
-
 export function GeneratorWorkspace() {
   const [step, setStep] = useState(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -45,18 +43,17 @@ export function GeneratorWorkspace() {
   const [downloadFilename, setDownloadFilename] = useState("");
   const [parseResult, setParseResult] = useState<Avk5ParseResult | null>(null);
   const uploadAbortRef = useRef<AbortController | null>(null);
+  const uploadRequestIdRef = useRef(0);
   const form = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
     defaultValues: emptyOrderValues,
     mode: "onBlur",
   });
-  const { fields } = useFieldArray({ control: form.control, name: "lines" });
-  const watchedLines = form.watch("lines");
   const watchedEstimatedAmount = form.watch("estimatedAmountThousandsUah");
-  const total = watchedLines.reduce((sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.price) || 0), 0);
 
   const handleFile = async (file: File) => {
     uploadAbortRef.current?.abort();
+    const requestId = ++uploadRequestIdRef.current;
     const controller = new AbortController();
     uploadAbortRef.current = controller;
     setErrorMessage("");
@@ -81,6 +78,7 @@ export function GeneratorWorkspace() {
         throw new Error("error" in payload ? payload.error.message : "Не вдалося прочитати файл.");
       }
 
+      if (requestId !== uploadRequestIdRef.current) return;
       const result = payload.result;
       const amountText = result.data.finalEstimatedTotalThousandsUahText ?? "";
       const nextValues: OrderForm = {
@@ -90,13 +88,13 @@ export function GeneratorWorkspace() {
         chiefProjectEngineer: result.data.chiefProjectEngineer ?? "",
         estimatedAmountThousandsUah: amountText,
         estimatedAmountInWords: amountText ? amountInWordsUkrainian(amountText) : "",
-        lines: orderLinesFromEstimate(result.data.items),
       };
       form.reset({ ...nextValues, ...buildOrderParagraphs(nextValues) });
       setParseResult(result);
       setStep(2);
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
+      if (requestId !== uploadRequestIdRef.current) return;
       setErrorMessage(error instanceof Error ? error.message : "Не вдалося обробити файл. Спробуйте ще раз.");
     } finally {
       if (uploadAbortRef.current === controller) {
@@ -152,6 +150,7 @@ export function GeneratorWorkspace() {
 
   const restart = () => {
     uploadAbortRef.current?.abort();
+    uploadRequestIdRef.current += 1;
     setStep(1);
     setSelectedFile(null);
     setDownloaded(false);
@@ -179,7 +178,7 @@ export function GeneratorWorkspace() {
             <div>
               <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary-hover"><Sparkles className="size-3.5" /> Спокійний помічник для кошторисів</div>
               <h1 className="max-w-2xl text-3xl font-semibold leading-[1.1] tracking-[-0.045em] text-foreground sm:text-5xl">Від кошторису до готового документа — без зайвих рухів.</h1>
-              <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">Завантажте файл, перевірте позиції та отримайте охайний AVK-5 у форматі DOCX.</p>
+              <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">Завантажте файл, перевірте реквізити наказу та отримайте охайний DOCX.</p>
             </div>
             <div className="hidden rounded-2xl border bg-white px-4 py-3 text-right sm:block">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Сесія без акаунта</p>
@@ -201,7 +200,6 @@ export function GeneratorWorkspace() {
           {step === 1 && <UploadStep isParsing={isParsing} selectedFile={selectedFile} onFile={(file) => void handleFile(file)} />}
           {step === 2 && (
             <ReviewEditStep
-              fields={fields}
               form={form}
               parseResult={parseResult}
               isGenerating={isGenerating}
@@ -211,7 +209,7 @@ export function GeneratorWorkspace() {
               onSubmit={handleGenerate}
             />
           )}
-          {step === 3 && <DownloadStep downloaded={downloaded} filename={downloadFilename} total={total} lineCount={fields.length} estimatedAmount={watchedEstimatedAmount} isGenerating={isGenerating} onBack={() => setStep(2)} onRestart={restart} onDownload={() => void handleGenerate(form.getValues())} />}
+          {step === 3 && <DownloadStep downloaded={downloaded} filename={downloadFilename} estimatedAmount={watchedEstimatedAmount} isGenerating={isGenerating} onBack={() => setStep(2)} onRestart={restart} onDownload={() => void handleGenerate(form.getValues())} />}
         </div>
       </div>
     </main>
@@ -238,7 +236,7 @@ function UploadStep({ isParsing, selectedFile, onFile }: { isParsing: boolean; s
             <div className="flex min-h-[310px] flex-col items-center justify-center rounded-[26px] border bg-accent/45 text-center" aria-live="polite">
               <LoaderCircle className="size-8 animate-spin text-primary-hover" />
               <p className="mt-5 text-sm font-semibold">Читаємо {selectedFile?.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">Готуємо позиції для перевірки…</p>
+              <p className="mt-1 text-sm text-muted-foreground">Готуємо реквізити наказу для перевірки…</p>
             </div>
           ) : <FileDropzone onFile={onFile} />}
           <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted-foreground"><FileWarning className="mt-0.5 size-3.5 shrink-0 text-primary-hover" /><span>До 4 МБ · лише RTF. Файл обробляється в пам’яті й не зберігається.</span></div>
@@ -252,7 +250,7 @@ function TrustRow({ icon, title, description }: { icon: React.ReactNode; title: 
   return <div className="flex items-start gap-3"><div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-accent text-primary-hover">{icon}</div><div><p className="text-sm font-semibold">{title}</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p></div></div>;
 }
 
-function DownloadStep({ downloaded, filename, total, lineCount, estimatedAmount, isGenerating, onBack, onRestart, onDownload }: { downloaded: boolean; filename: string; total: number; lineCount: number; estimatedAmount: string; isGenerating: boolean; onBack: () => void; onRestart: () => void; onDownload: () => void }) {
+function DownloadStep({ downloaded, filename, estimatedAmount, isGenerating, onBack, onRestart, onDownload }: { downloaded: boolean; filename: string; estimatedAmount: string; isGenerating: boolean; onBack: () => void; onRestart: () => void; onDownload: () => void }) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-8 p-7 sm:p-10 lg:grid-cols-[1fr_0.92fr] lg:gap-12 lg:p-12">
@@ -267,8 +265,8 @@ function DownloadStep({ downloaded, filename, total, lineCount, estimatedAmount,
         </div>
         <div className="rounded-[26px] border bg-background p-5 sm:p-6">
           <div className="rounded-2xl border bg-white p-5 surface-shadow sm:p-6">
-            <div className="flex items-start justify-between gap-4 border-b pb-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary-hover"><FileText className="size-5" /></div><div><p className="text-sm font-semibold">AVK-5</p><p className="mt-1 text-xs text-muted-foreground">Відомість ресурсів</p></div></div><Badge className="bg-accent text-success">DOCX</Badge></div>
-            <div className="space-y-4 py-5"><SummaryRow label="Статус" value="Підготовлено" success /><SummaryRow label="Позицій" value={lineCount ? `${lineCount} ${lineCount === 1 ? "позиція" : "позицій"}` : "Не додано"} /><SummaryRow label="Сума кошторису" value={estimatedAmount ? `${estimatedAmount} тис. грн` : money.format(total)} /></div>
+            <div className="flex items-start justify-between gap-4 border-b pb-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary-hover"><FileText className="size-5" /></div><div><p className="text-sm font-semibold">Офіційний наказ</p><p className="mt-1 text-xs text-muted-foreground">Реквізити кошторису</p></div></div><Badge className="bg-accent text-success">DOCX</Badge></div>
+            <div className="space-y-4 py-5"><SummaryRow label="Статус" value="Підготовлено" success /><SummaryRow label="Фінальна сума" value={estimatedAmount ? `${estimatedAmount} тис. грн` : "Не визначено"} /></div>
             <div className="border-t pt-5"><div className="flex items-center justify-between text-xs text-muted-foreground"><span>Готовність</span><span>100%</span></div><Progress className="mt-2" value={100} /></div>
           </div>
           <p className="mt-4 flex items-start gap-2 px-1 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />Документ сформовано без постійного зберігання.</p>

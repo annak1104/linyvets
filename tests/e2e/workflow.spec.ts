@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import PizZip from "pizzip";
 
 const fixturePath = resolve(process.cwd(), "reference/6_КД_ЗКР.rtf");
+const secondFixturePath = resolve(process.cwd(), "reference/10_КД_ЗКР.rtf");
+const localFixturePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
 const auditDir = resolve(process.cwd(), "qa/reliability-audit");
 
 function saveScreenshotPath(name: string): string {
@@ -59,7 +61,8 @@ test.describe("Лінивець complete workflow", () => {
     expect(xml).not.toContain("Кравчука");
     await expect(page.getByText("Крок 3 · Документ готовий")).toBeVisible();
     await expect(page.getByText(download.suggestedFilename())).toBeVisible();
-    await expect(page.getByText("8 позицій")).toBeVisible();
+    await expect(page.getByText("Офіційний наказ")).toBeVisible();
+    await expect(page.getByText("Позиції замовлення")).toHaveCount(0);
     await expect(page.getByText("12345,678 тис. грн")).toBeVisible();
     await page.screenshot({ path: saveScreenshotPath(`04-download-${testInfo.project.name}.png`), fullPage: true });
 
@@ -67,9 +70,10 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByRole("heading", { name: "Почнемо з вашого кошторису." })).toBeVisible();
     const secondChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
-    await (await secondChooser).setFiles(fixturePath);
+    await (await secondChooser).setFiles(secondFixturePath);
     await expect(page.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByLabel("Назва проєкту")).toHaveValue("Поточний ремонт проїзду до будинку №19б на вулиці Кравчука до вулиці Конякіна в місті Луцьку Волинської області");
+    await expect(page.getByLabel("Назва проєкту")).toHaveValue("Поточний ремонт вулиці Іова Кондзелевича в місті Луцьку Волинської області");
+    await expect(page.getByLabel("Сума, тис. грн")).toHaveValue("215,007");
     await expect(page.getByLabel("Назва проєкту")).not.toHaveValue(projectName);
   });
 
@@ -92,5 +96,19 @@ test.describe("Лінивець complete workflow", () => {
     await (await retryChooser).setFiles(fixturePath);
     await expect(page.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: saveScreenshotPath(`07-review-${testInfo.project.name}.png`), fullPage: true });
+  });
+
+  test("populates the local-estimate fields without exposing work items", async ({ page }) => {
+    await page.goto("/");
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
+    await (await chooser).setFiles(localFixturePath);
+
+    await expect(page.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel("Назва проєкту")).toHaveValue("Поточний ремонт вулиці Ветеранів в місті Луцьку Волинської області");
+    await expect(page.getByLabel("Сума, тис. грн")).toHaveValue("144,079");
+    await expect(page.getByLabel("Головний інженер проєкту")).toHaveValue("");
+    await expect(page.getByText("Позиції замовлення")).toHaveCount(0);
+    await expect(page.getByText("Показати джерело реквізитів наказу")).toBeVisible();
   });
 });

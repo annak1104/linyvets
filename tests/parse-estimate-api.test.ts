@@ -6,6 +6,8 @@ import { POST } from "@/app/api/parse-estimate/route";
 import { MAX_RTF_FILE_SIZE_BYTES } from "@/lib/upload-validation";
 
 const fixture = readFileSync(resolve(process.cwd(), "reference/6_КД_ЗКР.rtf"));
+const secondFixture = readFileSync(resolve(process.cwd(), "reference/10_КД_ЗКР.rtf"));
+const localFixture = readFileSync(resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf"));
 
 function uploadRequest(name: string, bytes: Buffer, type = "application/rtf") {
   const formData = new FormData();
@@ -23,9 +25,12 @@ describe("POST /api/parse-estimate", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(body.result.extractionStatus).toBe("extracted");
+    expect(body.result.data.documentType).toBe("consolidated-estimate");
     expect(body.result.data.projectName).toContain("Поточний ремонт проїзду");
     expect(body.result.data.finalEstimatedTotalThousandsUahText).toBe("197,271");
     expect(body.result.data.chiefProjectEngineer).toBe("Ігор ШЕВЧУК");
+    expect(body.result.data.preparedBy).toBe("Ігор ШЕВЧУК");
     expect(body.result.data.items.length).toBe(8);
     expect(body.result.data.itemsTotalThousandsUah).toBe(197.271);
     expect(body.result.verification.status).toBe("verified");
@@ -41,6 +46,34 @@ describe("POST /api/parse-estimate", () => {
       code: "UNSUPPORTED_EXTENSION",
       message: "Підтримуються лише файли з розширенням .rtf.",
     });
+  });
+
+  it("keeps sequential uploads isolated when the estimate changes", async () => {
+    const first = await POST(uploadRequest("first.rtf", fixture));
+    const second = await POST(uploadRequest("second.rtf", secondFixture));
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(firstBody.result.data.finalEstimatedTotalThousandsUahText).toBe("197,271");
+    expect(secondBody.result.data.finalEstimatedTotalThousandsUahText).toBe("215,007");
+    expect(secondBody.result.data.projectName).toContain("Іова Кондзелевича");
+    expect(secondBody.result.data.projectName).not.toContain("Кравчука");
+  });
+
+  it.each([
+    ["local then consolidated", localFixture, fixture],
+    ["consolidated then local", fixture, localFixture],
+  ])("keeps %s uploads isolated", async (_label, firstBytes, secondBytes) => {
+    const first = await POST(uploadRequest("first.rtf", firstBytes));
+    const second = await POST(uploadRequest("second.rtf", secondBytes));
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+
+    expect(firstBody.result.data.documentType === "local-estimate" ? firstBody.result.data.finalEstimatedTotalThousandsUahText : firstBody.result.data.finalEstimatedTotalThousandsUahText).toBe(
+      firstBytes === localFixture ? "144,079" : "197,271",
+    );
+    expect(secondBody.result.data.documentType === "local-estimate").toBe(secondBytes === localFixture);
+    expect(secondBody.result.data.finalEstimatedTotalThousandsUahText).toBe(secondBytes === localFixture ? "144,079" : "197,271");
   });
 
   it("rejects empty, non-RTF, corrupted, and oversized uploads", async () => {
