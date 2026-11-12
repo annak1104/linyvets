@@ -5,9 +5,10 @@ import PizZip from "pizzip";
 
 import {
   amountInWordsUkrainian,
-  type DecimalInput,
   formatThousandsUah,
+  type DecimalInput,
 } from "@/lib/ua-currency-to-words";
+import { formatProjectOrganizationHead } from "@/lib/order-form";
 
 export type OfficialOrderTemplateData = {
   projectName?: string;
@@ -52,7 +53,7 @@ function projectParagraph(data: OfficialOrderTemplateData, amount: string, words
 }
 
 function organizationParagraph(value: string | undefined): string {
-  return value ? `Проєктна організація: ${value}` : "";
+  return value ? `Проєктна організація: ${formatProjectOrganizationHead(value)}` : "";
 }
 
 function engineerParagraph(data: OfficialOrderTemplateData): string {

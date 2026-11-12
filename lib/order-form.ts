@@ -44,13 +44,19 @@ export const emptyOrderValues: OrderForm = {
   orderParagraph4: "",
 };
 
+export function formatProjectOrganizationHead(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  return /^ФОП(?:\s|$)/iu.test(normalized) ? normalized : `ФОП ${normalized}`;
+}
+
 export type OrderParagraphValues = Pick<OrderForm, "orderParagraph1" | "orderParagraph2" | "orderParagraph3" | "orderParagraph4">;
 
 export function buildOrderParagraphs(values: Pick<OrderForm, "projectName" | "estimatedAmountThousandsUah" | "estimatedAmountInWords" | "projectOrganization" | "chiefProjectEngineer" | "certificate">): OrderParagraphValues {
   const projectParagraph = values.projectName && values.estimatedAmountThousandsUah && values.estimatedAmountInWords
     ? `${values.projectName} в сумі ${values.estimatedAmountThousandsUah} тис. грн. (${values.estimatedAmountInWords});`
     : "";
-  const organizationParagraph = values.projectOrganization ? `Проєктна організація: ${values.projectOrganization}` : "";
+  const organizationParagraph = values.projectOrganization ? `Проєктна організація: ${formatProjectOrganizationHead(values.projectOrganization)}` : "";
   const engineerParagraph = values.chiefProjectEngineer
     ? `Головний інженер проєкту - ${values.chiefProjectEngineer}${values.certificate ? ` (сертифікат ${values.certificate})` : ""}.`
     : "";

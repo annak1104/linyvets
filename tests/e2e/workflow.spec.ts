@@ -34,8 +34,9 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel("Назва проєкту")).toHaveValue("Поточний ремонт проїзду до будинку №19б на вулиці Кравчука до вулиці Конякіна в місті Луцьку Волинської області");
     await expect(page.getByLabel("Сума, тис. грн")).toHaveValue("197,271");
     await expect(page.getByLabel("Головний інженер проєкту")).toHaveValue("Ігор ШЕВЧУК");
+    await expect(page.getByLabel(/Проєктна організація/)).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByText("Кошторис успішно прочитано")).toBeVisible();
-    await expect(page.getByText("Проєктну організацію не зазначено у джерелі.")).toBeVisible();
+    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: ФОП Ігор ШЕВЧУК");
     await page.screenshot({ path: saveScreenshotPath(`02-review-parsed-${testInfo.project.name}.png`), fullPage: true });
 
     const projectName = "Поточний ремонт — оновлений об’єкт із дуже довгою назвою 2026";

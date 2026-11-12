@@ -17,7 +17,7 @@ describe("parseAvk5Estimate", () => {
     expect(result.data.projectName).toBe("Поточний ремонт проїзду до будинку №19б на вулиці Кравчука до вулиці Конякіна в місті Луцьку Волинської області");
     expect(result.data.finalEstimatedTotalThousandsUah).toBe(197.271);
     expect(result.data.finalEstimatedTotalThousandsUahText).toBe("197,271");
-    expect(result.data.projectOrganization).toBeNull();
+    expect(result.data.projectOrganization).toBe("Ігор ШЕВЧУК");
     expect(result.data.chiefProjectEngineer).toBe("Ігор ШЕВЧУК");
     expect(result.data.preparedBy).toBe("Ігор ШЕВЧУК");
     expect(result.data.items.length).toBeGreaterThan(1);
@@ -35,7 +35,7 @@ describe("parseAvk5Estimate", () => {
       estimateItemsTotalThousandsUah: 197.271,
     });
     expect(result.errors).toEqual([]);
-    expect(result.warnings).toEqual(expect.arrayContaining([
+    expect(result.warnings).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "MISSING_PROJECT_ORGANIZATION" }),
     ]));
     expect(result.evidence).toEqual(expect.arrayContaining([
@@ -44,6 +44,7 @@ describe("parseAvk5Estimate", () => {
       expect.objectContaining({ section: "estimate-table", matchedText: "197,271" }),
       expect.objectContaining({ section: "chief-engineer", matchedText: expect.stringContaining("Ігор ШЕВЧУК") }),
       expect.objectContaining({ section: "prepared-by", matchedText: expect.stringContaining("Ігор ШЕВЧУК") }),
+      expect.objectContaining({ section: "project-organization", matchedText: expect.stringContaining("Ігор ШЕВЧУК") }),
     ]));
   });
 
@@ -57,6 +58,7 @@ describe("parseAvk5Estimate", () => {
     expect(result.data.finalEstimatedTotalThousandsUah).not.toBe(result.data.items[0]?.totalThousandsUah);
     expect(result.data.items[0]?.totalThousandsUah).toBe(144.079);
     expect(result.data.preparedBy).toBe("Ігор ШЕВЧУК");
+    expect(result.data.projectOrganization).toBe("Ігор ШЕВЧУК");
     expect(result.data.items.length).toBe(8);
     expect(result.data.itemsTotalThousandsUah).toBe(215.007);
     expect(result.verification.status).toBe("verified");

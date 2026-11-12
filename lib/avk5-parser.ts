@@ -9,6 +9,7 @@ export type Avk5EvidenceSection =
   | "estimate-item"
   | "explanatory-summary"
   | "chief-engineer"
+  | "project-organization"
   | "prepared-by"
   | "organization-placeholder";
 
@@ -274,6 +275,9 @@ function extractAvk5Data(
   }
 
   const organizationMatch = findExplicitOrganization(paragraphs);
+  if (organizationMatch) {
+    evidence.push({ section: "project-organization", label: "Керівник проєктної організації", ...organizationMatch.evidence });
+  }
   if (!organizationMatch) {
     const placeholder = findEvidence(paragraphs, (text) => text.includes("назва організації"));
     if (placeholder) {
@@ -739,6 +743,12 @@ function findChiefEngineer(paragraphs: string[]) {
 
 function findExplicitOrganization(paragraphs: string[]) {
   for (const [index, text] of paragraphs.entries()) {
+    const headMatch = text.match(/Керівник\s+проєктної\s+організації\s*_*(?:\s*)?([А-ЯІЇЄҐІ][\p{L}'’ʼ-]+(?:\s+[А-ЯІЇЄҐІ][\p{L}'’ʼ-]+)+?)(?=\s+Головний\s+інженер|$)/u);
+    if (headMatch) {
+      const value = headMatch[1].trim();
+      if (value) return { value, evidence: makeEvidence(paragraphs, index, headMatch[0]) };
+    }
+
     const match = text.match(/(?:назва організації|організація)\s*[:\-]\s*([^()\n]+)$/i);
     if (match && !/що затверджує/i.test(match[1])) {
       const value = match[1].trim();

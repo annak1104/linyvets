@@ -132,6 +132,26 @@ describe("official order Docxtemplater template", () => {
     expect(documentXml(generatedFromFile)).toContain("Файловий тест");
   });
 
+  it("prefixes only the project-organization paragraph with ФОП", () => {
+    const generated = generateOfficialOrderDocx(readFileSync(templatePath), {
+      projectName: "Тестовий об’єкт",
+      estimatedAmountThousandsUah: "1",
+      projectOrganization: "Ігор ШЕВЧУК",
+      chiefProjectEngineer: "Ігор ШЕВЧУК",
+    });
+    const text = documentText(generated);
+
+    expect(text).toContain("Проєктна організація: ФОП Ігор ШЕВЧУК");
+    expect(text).toContain("Головний інженер проєкту - Ігор ШЕВЧУК.");
+    expect(text).not.toContain("Проєктна організація: ФОП ФОП");
+
+    const alreadyFormatted = generateOfficialOrderDocx(readFileSync(templatePath), {
+      projectOrganization: "ФОП Ігор ШЕВЧУК",
+    });
+    expect(documentText(alreadyFormatted)).toContain("Проєктна організація: ФОП Ігор ШЕВЧУК");
+    expect(documentText(alreadyFormatted)).not.toContain("ФОП ФОП");
+  });
+
   it("uses the neutral default order paragraph without copying source-specific text", () => {
     const generated = generateOfficialOrderDocx(readFileSync(templatePath), {
       projectName: "Тестовий проєкт",
