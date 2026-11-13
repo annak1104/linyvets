@@ -81,6 +81,9 @@ describe("ReviewEditStep", () => {
     expect(screen.getAllByDisplayValue("Поточний ремонт проїзду до будинку №19б")).toHaveLength(1);
     expect(screen.getByDisplayValue("Ігор ШЕВЧУК")).toBeTruthy();
     expect(screen.getByText(/Проєктну організацію не зазначено у джерелі/)).toBeTruthy();
+    expect(screen.getByText("Автоматично").classList.contains("whitespace-nowrap")).toBe(true);
+    expect(screen.getAllByText("Не знайдено у джерелі").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Знайдено у джерелі")[0].classList.contains("bg-accent")).toBe(true);
     expect(screen.getByText("Показати джерело реквізитів наказу")).toBeTruthy();
     expect(screen.queryByText("Позиції замовлення")).toBeNull();
     expect(screen.queryByText("Дані з кошторису")).toBeNull();
@@ -91,6 +94,7 @@ describe("ReviewEditStep", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("Двісті тисяч грн 00 коп.")).toBeTruthy();
       expect(screen.getByDisplayValue(/в сумі 200 тис\. грн\./)).toBeTruthy();
+      expect(screen.getByText("Змінено вручну").classList.contains("bg-cream")).toBe(true);
       expect(screen.getAllByText(/200/).length).toBeGreaterThan(0);
     });
   });

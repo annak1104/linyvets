@@ -138,7 +138,7 @@ export function ReviewEditStep({
                 <Field label="Сертифікат" hint={fieldStateHint(null, Boolean(form.formState.dirtyFields.certificate))}>
                   <Input {...form.register("certificate")} placeholder="Не зазначено у джерелі" />
                 </Field>
-                <Field label="Сума українською" hint="Перераховується автоматично">
+                <Field label="Сума українською" hint="Автоматично">
                   <Textarea className="min-h-24 bg-background" readOnly {...form.register("estimatedAmountInWords")} placeholder="З’явиться після введення суми" />
                 </Field>
               </div>
@@ -255,10 +255,17 @@ function documentTypeLabel(type: Avk5ParseResult["data"]["documentType"]): strin
 }
 
 function fieldStateHint(sourceValue: string | number | null | undefined, edited: boolean): string {
-  if (edited) return "змінено вручну";
-  return sourceValue === null || sourceValue === undefined || sourceValue === "" ? "не знайдено у джерелі" : "знайдено у джерелі";
+  if (edited) return "Змінено вручну";
+  return sourceValue === null || sourceValue === undefined || sourceValue === "" ? "Не знайдено у джерелі" : "Знайдено у джерелі";
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {
-  return <label className="block space-y-2 text-sm font-semibold"> <span>{label}{hint && <span className="ml-2 text-[11px] font-normal text-muted-foreground">{hint}</span>}</span>{children}{error && <span className="block text-xs font-normal text-primary-hover">{error}</span>}</label>;
+  return <label className="block space-y-2 text-sm font-semibold"><span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 leading-5"><span className="shrink-0">{label}</span>{hint && <span className={fieldHintClass(hint)}>{hint}</span>}</span>{children}{error && <span className="block text-xs font-normal text-primary-hover">{error}</span>}</label>;
+}
+
+function fieldHintClass(hint: string): string {
+  if (/не знайдено/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold leading-4 text-rose-700";
+  if (/змінено/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-cream px-2 py-0.5 text-[10px] font-semibold leading-4 text-primary-hover";
+  if (/автоматично/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-background px-2 py-0.5 text-[10px] font-medium leading-4 text-muted-foreground";
+  return "inline-flex whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium leading-4 text-primary-hover";
 }
