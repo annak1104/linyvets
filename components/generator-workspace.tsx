@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { FileDropzone } from "@/components/file-dropzone";
 import { SlothLogo } from "@/components/brand/sloth-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Stepper } from "@/components/stepper";
 import { ReviewEditStep } from "@/components/review-edit-step";
 
@@ -162,12 +163,13 @@ export function GeneratorWorkspace() {
 
   return (
     <main className="min-h-screen bg-background">
-      <header className="border-b bg-white/90 backdrop-blur">
+      <header className="border-b bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8 sm:py-5">
           <SlothLogo compact />
-          <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground sm:gap-5">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground sm:gap-4">
             <span className="hidden items-center gap-2 sm:flex"><ShieldCheck className="size-4 text-success" /> Дані тільки у вашій сесії</span>
             <span className="rounded-full border bg-accent px-3 py-1.5 text-primary-hover">AVK-5</span>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -180,13 +182,13 @@ export function GeneratorWorkspace() {
               <h1 className="max-w-2xl text-3xl font-semibold leading-[1.1] tracking-[-0.045em] text-foreground sm:text-5xl">Від кошторису до готового документа — без зайвих рухів.</h1>
               <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">Завантажте файл, перевірте реквізити наказу та отримайте охайний DOCX.</p>
             </div>
-            <div className="hidden rounded-2xl border bg-white px-4 py-3 text-right sm:block">
+            <div className="hidden rounded-2xl border bg-card px-4 py-3 text-right sm:block">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Сесія без акаунта</p>
               <p className="mt-1 text-sm font-semibold text-foreground">3 прості кроки</p>
             </div>
           </div>
 
-          <div className="mb-7 rounded-2xl border bg-white px-4 py-4 surface-shadow sm:mb-8 sm:px-6">
+          <div className="mb-7 rounded-2xl border bg-card px-4 py-4 surface-shadow sm:mb-8 sm:px-6">
             <Stepper currentStep={step} />
           </div>
 
@@ -264,7 +266,7 @@ function DownloadStep({ downloaded, filename, estimatedAmount, isGenerating, onB
           <Button variant="ghost" className="mt-3 w-fit px-0" onClick={onRestart}><RotateCcw className="size-4" /> Створити новий документ</Button>
         </div>
         <div className="rounded-[26px] border bg-background p-5 sm:p-6">
-          <div className="rounded-2xl border bg-white p-5 surface-shadow sm:p-6">
+          <div className="rounded-2xl border bg-card p-5 surface-shadow sm:p-6">
             <div className="flex items-start justify-between gap-4 border-b pb-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary-hover"><FileText className="size-5" /></div><div><p className="text-sm font-semibold">Офіційний наказ</p><p className="mt-1 text-xs text-muted-foreground">Реквізити кошторису</p></div></div><Badge className="bg-accent text-success">DOCX</Badge></div>
             <div className="space-y-4 py-5"><SummaryRow label="Статус" value="Підготовлено" success /><SummaryRow label="Фінальна сума" value={estimatedAmount ? `${estimatedAmount} тис. грн` : "Не визначено"} /></div>
             <div className="border-t pt-5"><div className="flex items-center justify-between text-xs text-muted-foreground"><span>Готовність</span><span>100%</span></div><Progress className="mt-2" value={100} /></div>

@@ -247,7 +247,7 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
 }
 
 function fieldHintClass(hint: string): string {
-  if (/не знайдено/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold leading-4 text-rose-700";
+  if (/не знайдено/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-danger-soft px-2 py-0.5 text-[10px] font-semibold leading-4 text-danger";
   if (/змінено/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-cream px-2 py-0.5 text-[10px] font-semibold leading-4 text-primary-hover";
   if (/автоматично/i.test(hint)) return "inline-flex whitespace-nowrap rounded-full bg-background px-2 py-0.5 text-[10px] font-medium leading-4 text-muted-foreground";
   return "inline-flex whitespace-nowrap rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium leading-4 text-primary-hover";

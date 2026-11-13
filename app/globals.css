@@ -1,16 +1,45 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --background: #f4f9fc;
   --foreground: #234a63;
   --muted-foreground: #6c8799;
   --border: #dceaf3;
   --card: #ffffff;
+  --input: #ffffff;
   --primary: #6daed6;
   --primary-hover: #508fb7;
+  --primary-foreground: #ffffff;
   --accent: #eaf5fc;
   --cream: #fff6e9;
+  --cream-hover: #ffeed7;
   --success: #16856a;
+  --success-foreground: #ffffff;
+  --danger-soft: #fff0f1;
+  --danger: #b34450;
+  --focus: rgba(109, 174, 214, 0.45);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b1120;
+  --foreground: #e8f0fa;
+  --muted-foreground: #94a8bf;
+  --border: #2a3b52;
+  --card: #141e30;
+  --input: #1b2940;
+  --primary: #65a9f5;
+  --primary-hover: #8bc2ff;
+  --primary-foreground: #0b1120;
+  --accent: #1b2940;
+  --cream: #3b2c20;
+  --cream-hover: #4b3828;
+  --success: #53d6b0;
+  --success-foreground: #0b1120;
+  --danger-soft: #462630;
+  --danger: #ffb4c0;
+  --focus: rgba(101, 169, 245, 0.55);
 }
 
 @theme inline {
@@ -19,11 +48,17 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
   --color-card: var(--card);
+  --color-input: var(--input);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-cream: var(--cream);
+  --color-cream-hover: var(--cream-hover);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger: var(--danger);
   --font-sans: "Avenir Next", Avenir, "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -64,7 +99,15 @@ textarea {
   box-shadow: 0 12px 32px rgba(35, 74, 99, 0.06), 0 2px 8px rgba(35, 74, 99, 0.025);
 }
 
+:root[data-theme="dark"] .soft-shadow {
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+:root[data-theme="dark"] .surface-shadow {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.16);
+}
+
 .focus-ring:focus-visible {
-  outline: 3px solid rgba(109, 174, 214, 0.45);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }

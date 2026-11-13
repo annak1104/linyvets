@@ -4,11 +4,11 @@ import { cn } from "@/lib/utils";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "outline" | "cream";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-white shadow-sm hover:bg-primary-hover",
-  secondary: "bg-primary text-white shadow-sm hover:bg-primary-hover",
+  primary: "bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover",
+  secondary: "bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover",
   ghost: "text-muted-foreground hover:bg-accent hover:text-foreground",
-  outline: "border bg-white text-foreground shadow-sm hover:bg-accent",
-  cream: "bg-cream text-foreground shadow-sm hover:bg-[#ffeed7]",
+  outline: "border bg-card text-foreground shadow-sm hover:bg-accent",
+  cream: "bg-cream text-foreground shadow-sm hover:bg-cream-hover",
 };
 
 export function Button({ className, variant = "primary", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {

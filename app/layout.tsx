@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
   title: "Лінивець — генератор AVK-5",
@@ -13,8 +15,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="uk">
-      <body>{children}</body>
+    <html lang="uk" suppressHydrationWarning>
+      <head>
+        <Script id="theme-init" strategy="beforeInteractive">{`(() => {
+  try {
+    const saved = localStorage.getItem("linyvets-theme");
+    const theme = saved === "light" || saved === "dark"
+      ? saved
+      : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.dataset.theme = theme;
+  } catch {}
+})();`}</Script>
+      </head>
+      <body><ThemeProvider>{children}</ThemeProvider></body>
     </html>
   );
 }

@@ -33,7 +33,7 @@ export function SlothLogo({
       {showWordmark && (
         <span
           className={cn(
-            "text-xl font-semibold tracking-[-0.03em] text-[#234A63]",
+            "text-xl font-semibold tracking-[-0.03em] text-foreground",
             compact && "text-base",
           )}
         >

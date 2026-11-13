@@ -35,13 +35,13 @@ export function FileDropzone({ onFile }: { onFile: (file: File) => void }) {
           event.currentTarget.value = "";
         }}
       />
-      <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white text-primary-hover shadow-sm transition-transform group-hover:-translate-y-0.5">
+      <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-card text-primary-hover shadow-sm transition-transform group-hover:-translate-y-0.5">
         <UploadCloud className="size-6" />
       </div>
       <h3 className="mt-5 text-lg font-semibold tracking-tight">Перетягніть кошторис сюди</h3>
       <p className="mt-2 text-sm text-muted-foreground">або натисніть, щоб обрати файл на пристрої</p>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5"><FileText className="size-3.5 text-primary-hover" /> RTF</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5"><FileText className="size-3.5 text-primary-hover" /> RTF</span>
       </div>
     </div>
   );

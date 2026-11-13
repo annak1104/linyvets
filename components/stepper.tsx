@@ -16,7 +16,7 @@ export function Stepper({ currentStep }: { currentStep: number }) {
         return (
           <div className="flex min-w-0 flex-none items-start sm:flex-1" key={step.number}>
             <div className="flex min-w-0 items-center gap-2.5">
-              <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors", isDone && "border-success bg-success text-white", isCurrent && "border-primary bg-primary text-white", !isDone && !isCurrent && "bg-white text-muted-foreground")}>
+              <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-full border text-sm font-semibold transition-colors", isDone && "border-success bg-success text-success-foreground", isCurrent && "border-primary bg-primary text-primary-foreground", !isDone && !isCurrent && "bg-card text-muted-foreground")}>
                 {isDone ? <Check className="size-4" /> : step.number}
               </div>
               <div className="min-w-0">
