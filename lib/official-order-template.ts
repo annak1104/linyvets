@@ -8,7 +8,6 @@ import {
   formatThousandsUah,
   type DecimalInput,
 } from "@/lib/ua-currency-to-words";
-import { formatProjectOrganizationHead } from "@/lib/order-form";
 
 export type OfficialOrderTemplateData = {
   projectName?: string;
@@ -53,12 +52,13 @@ function projectParagraph(data: OfficialOrderTemplateData, amount: string, words
 }
 
 function organizationParagraph(value: string | undefined): string {
-  return value ? `Проєктна організація: ${formatProjectOrganizationHead(value)}` : "";
+  return `Проєктна організація: ${value ?? ""}`;
 }
 
 function engineerParagraph(data: OfficialOrderTemplateData): string {
-  if (!data.chiefProjectEngineer) return "";
-  return `Головний інженер проєкту - ${data.chiefProjectEngineer}${certificatePhrase(data.certificate)}.`;
+  const engineerName = data.chiefProjectEngineer ?? "";
+  const certificate = engineerName ? certificatePhrase(data.certificate) : "";
+  return `Головний інженер проєкту: ${engineerName}${certificate}`;
 }
 
 export function buildOfficialOrderTemplateValues(data: OfficialOrderTemplateData): Record<string, string> {

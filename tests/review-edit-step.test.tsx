@@ -80,6 +80,10 @@ describe("ReviewEditStep", () => {
 
     expect(screen.getAllByDisplayValue("Поточний ремонт проїзду до будинку №19б")).toHaveLength(1);
     expect(screen.getByDisplayValue("Ігор ШЕВЧУК")).toBeTruthy();
+    await waitFor(() => {
+      expect((screen.getByLabelText("Абзац 3 · організація") as HTMLTextAreaElement).value).toBe("Проєктна організація: ");
+      expect((screen.getByLabelText("Абзац 4 · інженер") as HTMLTextAreaElement).value).toBe("Головний інженер проєкту: Ігор ШЕВЧУК");
+    });
     expect(screen.getByText(/Проєктну організацію не зазначено у джерелі/)).toBeTruthy();
     expect(screen.getByText("Автоматично").classList.contains("whitespace-nowrap")).toBe(true);
     expect(screen.getAllByText("Не знайдено у джерелі").length).toBeGreaterThan(0);
@@ -119,5 +123,21 @@ describe("ReviewEditStep", () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onInvalid).not.toHaveBeenCalled();
+  });
+
+  it("preserves manually edited organization and engineer paragraphs during repeated synchronization", async () => {
+    render(<ReviewHarness />);
+
+    const organizationParagraph = screen.getByLabelText("Абзац 3 · організація");
+    const engineerParagraph = screen.getByLabelText("Абзац 4 · інженер");
+    fireEvent.change(organizationParagraph, { target: { value: "Власний абзац організації" } });
+    fireEvent.change(engineerParagraph, { target: { value: "Власний абзац інженера" } });
+    fireEvent.change(screen.getByLabelText(/Проєктна організація/), { target: { value: "Нове ім’я" } });
+    fireEvent.change(screen.getByLabelText(/^Головний інженер проєкту/), { target: { value: "Новий інженер" } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Власний абзац організації")).toBeTruthy();
+      expect(screen.getByDisplayValue("Власний абзац інженера")).toBeTruthy();
+    });
   });
 });

@@ -17,7 +17,7 @@ import {
 
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
-import { buildOrderParagraphs, type OrderForm, type OrderParagraphValues } from "@/lib/order-form";
+import { buildOrderParagraphs, type OrderForm } from "@/lib/order-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,21 +46,6 @@ export function ReviewEditStep({
   const values = useWatch({ control: form.control }) as OrderForm;
   const amount = useWatch({ control: form.control, name: "estimatedAmountThousandsUah" });
   const lastGeneratedWords = useRef("");
-  const lastGeneratedParagraphs = useRef<OrderParagraphValues>({
-    orderParagraph1: form.getValues("orderParagraph1"),
-    orderParagraph2: form.getValues("orderParagraph2"),
-    orderParagraph3: form.getValues("orderParagraph3"),
-    orderParagraph4: form.getValues("orderParagraph4"),
-  });
-
-  useEffect(() => {
-    lastGeneratedParagraphs.current = {
-      orderParagraph1: form.getValues("orderParagraph1"),
-      orderParagraph2: form.getValues("orderParagraph2"),
-      orderParagraph3: form.getValues("orderParagraph3"),
-      orderParagraph4: form.getValues("orderParagraph4"),
-    };
-  }, [form, parseResult]);
 
   useEffect(() => {
     const rawAmount = amount.trim();
@@ -88,13 +73,11 @@ export function ReviewEditStep({
   useEffect(() => {
     const generated = buildOrderParagraphs(values);
     for (const key of ["orderParagraph2", "orderParagraph3", "orderParagraph4"] as const) {
-      const current = form.getValues(key);
-      if (current === lastGeneratedParagraphs.current[key]) {
+      if (!form.formState.dirtyFields[key] && form.getValues(key) !== generated[key]) {
         form.setValue(key, generated[key], { shouldDirty: false, shouldValidate: false });
-        lastGeneratedParagraphs.current[key] = generated[key];
       }
     }
-  }, [form, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
+  }, [form, form.formState.dirtyFields, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
 
   return (
     <form noValidate onSubmit={form.handleSubmit(onSubmit, onInvalid)}>

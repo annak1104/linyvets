@@ -36,7 +36,15 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel("Головний інженер проєкту")).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByLabel(/Проєктна організація/)).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByText("Кошторис успішно прочитано")).toBeVisible();
-    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: ФОП Ігор ШЕВЧУК");
+    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: Ігор ШЕВЧУК");
+    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Головний інженер проєкту: Ігор ШЕВЧУК");
+
+    await page.getByLabel("Абзац 3 · організація").fill("Організаційний абзац, відредагований вручну");
+    await page.getByLabel(/Проєктна організація/).fill("Нове ім’я керівника");
+    await page.getByLabel("Абзац 4 · інженер").fill("Інженерний абзац, відредагований вручну");
+    await page.getByLabel("Головний інженер проєкту").fill("Новий інженер");
+    await expect(page.getByLabel("Абзац 3 · організація")).toHaveValue("Організаційний абзац, відредагований вручну");
+    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Інженерний абзац, відредагований вручну");
     await page.screenshot({ path: saveScreenshotPath(`02-review-parsed-${testInfo.project.name}.png`), fullPage: true });
 
     const projectName = "Поточний ремонт — оновлений об’єкт із дуже довгою назвою 2026";
@@ -57,7 +65,8 @@ test.describe("Лінивець complete workflow", () => {
     expect(xml).toContain(projectName);
     expect(xml).toContain("12345,678");
     expect(xml).toContain("Дванадцять мільйонів триста сорок п’ять тисяч шістсот сімдесят вісім грн 00 коп.");
-    expect(xml).toContain("Ігор ШЕВЧУК");
+    expect(xml).toContain("Організаційний абзац, відредагований вручну");
+    expect(xml).toContain("Інженерний абзац, відредагований вручну");
     expect(xml).not.toContain("{{");
     expect(xml).not.toContain("Кравчука");
     await expect(page.getByText("Крок 3 · Документ готовий")).toBeVisible();

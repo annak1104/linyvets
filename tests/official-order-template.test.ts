@@ -110,8 +110,8 @@ describe("official order Docxtemplater template", () => {
     expect(text).toContain("197,271");
     expect(text).toContain("Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.");
     expect(text).toContain("Ігор ШЕВЧУК");
-    expect(text).not.toContain("Проєктна організація:");
-    expect(text).toContain("Головний інженер проєкту - Ігор ШЕВЧУК.");
+    expect(text).toContain("Проєктна організація:");
+    expect(text).toContain("Головний інженер проєкту: Ігор ШЕВЧУК");
     expect(text).toContain("ЛУЦЬКА  МІСЬКА  РАДА");
     expect(text).toContain("Василь ЛІЩУК");
     expect(xml).not.toContain("Кравчука");
@@ -132,7 +132,7 @@ describe("official order Docxtemplater template", () => {
     expect(documentXml(generatedFromFile)).toContain("Файловий тест");
   });
 
-  it("prefixes only the project-organization paragraph with ФОП", () => {
+  it("defaults both organization paragraphs to editable labels without prefixes", () => {
     const generated = generateOfficialOrderDocx(readFileSync(templatePath), {
       projectName: "Тестовий об’єкт",
       estimatedAmountThousandsUah: "1",
@@ -141,15 +141,16 @@ describe("official order Docxtemplater template", () => {
     });
     const text = documentText(generated);
 
-    expect(text).toContain("Проєктна організація: ФОП Ігор ШЕВЧУК");
-    expect(text).toContain("Головний інженер проєкту - Ігор ШЕВЧУК.");
-    expect(text).not.toContain("Проєктна організація: ФОП ФОП");
+    expect(text).toContain("Проєктна організація: Ігор ШЕВЧУК");
+    expect(text).toContain("Головний інженер проєкту: Ігор ШЕВЧУК");
+    expect(text).not.toContain("ФОП");
 
-    const alreadyFormatted = generateOfficialOrderDocx(readFileSync(templatePath), {
-      projectOrganization: "ФОП Ігор ШЕВЧУК",
+    const missingNames = generateOfficialOrderDocx(readFileSync(templatePath), {
+      projectOrganization: "",
+      chiefProjectEngineer: "",
     });
-    expect(documentText(alreadyFormatted)).toContain("Проєктна організація: ФОП Ігор ШЕВЧУК");
-    expect(documentText(alreadyFormatted)).not.toContain("ФОП ФОП");
+    expect(documentText(missingNames)).toContain("Проєктна організація:");
+    expect(documentText(missingNames)).toContain("Головний інженер проєкту:");
   });
 
   it("uses the neutral default order paragraph without copying source-specific text", () => {
