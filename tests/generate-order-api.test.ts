@@ -11,6 +11,7 @@ import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 
 const sourcePath = resolve(process.cwd(), "reference/Кравчука.docx");
 const localEstimatePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
+const longProjectEstimatePath = resolve(process.cwd(), "reference/67_КД_ЗКР.rtf");
 
 const editedOrder: OrderForm = {
   projectName: "Новий проєкт / об’єкт: 2026",
@@ -147,5 +148,37 @@ describe("POST /api/generate-order", () => {
     expect(xml).toContain("Поточний ремонт вулиці Іова Кондзелевича");
     expect(xml).toContain("215,007");
     expect(xml).not.toContain("Поточний ремонт проїзду до будинку");
+  });
+
+  it("preserves the complete wrapped project name from the long estimate in DOCX", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(longProjectEstimatePath));
+    const projectName = parsed.data.projectName ?? "";
+    const amountText = parsed.data.finalEstimatedTotalThousandsUahText ?? "";
+    const values = {
+      ...editedOrder,
+      projectName,
+      estimatedAmountThousandsUah: amountText,
+      estimatedAmountInWords: amountInWordsUkrainian(amountText),
+      ...buildOrderParagraphs({
+        projectName,
+        estimatedAmountThousandsUah: amountText,
+        estimatedAmountInWords: amountInWordsUkrainian(amountText),
+        projectOrganization: parsed.data.projectOrganization ?? "",
+        chiefProjectEngineer: parsed.data.chiefProjectEngineer ?? "",
+        certificate: "",
+      }),
+    } satisfies OrderForm;
+
+    const response = await POST(new Request("http://localhost/api/generate-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    }));
+    const xml = packagePart(Buffer.from(await response.arrayBuffer()), "word/document.xml").toString("utf8");
+    const decodedXml = xml.replaceAll("&quot;", '"');
+
+    expect(response.status).toBe(200);
+    expect(decodedXml).toContain(projectName);
+    expect(decodedXml).toContain("Волинської області");
   });
 });

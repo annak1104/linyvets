@@ -6,6 +6,7 @@ import PizZip from "pizzip";
 const fixturePath = resolve(process.cwd(), "reference/6_КД_ЗКР.rtf");
 const secondFixturePath = resolve(process.cwd(), "reference/10_КД_ЗКР.rtf");
 const localFixturePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
+const longProjectFixturePath = resolve(process.cwd(), "reference/67_КД_ЗКР.rtf");
 const auditDir = resolve(process.cwd(), "qa/reliability-audit");
 
 function saveScreenshotPath(name: string): string {
@@ -120,5 +121,26 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel("Головний інженер проєкту")).toHaveValue("");
     await expect(page.getByText("Позиції замовлення")).toHaveCount(0);
     await expect(page.getByText("Показати джерело реквізитів наказу")).toBeVisible();
+  });
+
+  test("keeps the complete wrapped project name in the form, preview, and generated DOCX", async ({ page }) => {
+    const projectName = "Поточний ремонт зупинки громадського транспорту \"Мостозагін\", що на вул.Ківерцівська,біля будинку 9б (непарна сторона) в місті Луцьку Волинської області";
+
+    await page.goto("/");
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
+    await (await chooser).setFiles(longProjectFixturePath);
+
+    await expect(page.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel("Назва проєкту")).toHaveValue(projectName);
+    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText(projectName);
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: /Сформувати AVK-5/ }).click();
+    const download = await downloadPromise;
+    const downloadedPath = await download.path();
+
+    expect(downloadedPath).not.toBeNull();
+    expect(documentXml(readFileSync(downloadedPath!)).replaceAll("&quot;", '"')).toContain(projectName);
   });
 });

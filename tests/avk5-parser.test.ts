@@ -6,6 +6,7 @@ import { parseAvk5Estimate } from "@/lib/avk5-parser";
 const fixturePath = resolve(process.cwd(), "reference/6_КД_ЗКР.rtf");
 const secondFixturePath = resolve(process.cwd(), "reference/10_КД_ЗКР.rtf");
 const localFixturePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
+const longProjectFixturePath = resolve(process.cwd(), "reference/67_КД_ЗКР.rtf");
 
 describe("parseAvk5Estimate", () => {
   it("extracts exact values and evidence from the real CP1251 fixture", async () => {
@@ -107,6 +108,12 @@ describe("parseAvk5Estimate", () => {
       expect.objectContaining({ section: "estimate-table", matchedText: expect.stringContaining("144079") }),
       expect.objectContaining({ section: "prepared-by", matchedText: expect.stringContaining("Ігор ШЕВЧУК") }),
     ]));
+  });
+
+  it("extracts the complete wrapped project name from the long consolidated title", async () => {
+    const result = await parseAvk5Estimate(readFileSync(longProjectFixturePath));
+
+    expect(result.data.projectName).toBe("Поточний ремонт зупинки громадського транспорту \"Мостозагін\", що на вул.Ківерцівська,біля будинку 9б (непарна сторона) в місті Луцьку Волинської області");
   });
 
   it("returns a clear error for non-RTF input", async () => {

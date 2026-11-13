@@ -675,17 +675,17 @@ function findGenericFinalTotal(paragraphs: string[], documentType: Avk5DocumentT
 }
 
 function findProjectName(paragraphs: string[]) {
-  const index = paragraphs.findIndex((text) => text.includes(PROJECT_NAME_SECTION) && text.includes("Складений в поточних цінах"));
-  if (index >= 0) {
-    const text = paragraphs[index];
-    const match = text.match(new RegExp(`${escapeRegExp(PROJECT_NAME_SECTION)}[\\s\\S]*?№\\s*(.+?)\\s+Складений в поточних цінах`));
-    if (match) return { value: match[1].trim(), evidence: makeEvidence(paragraphs, index, match[1].trim()) };
+  const sectionIndex = paragraphs.findIndex((text) => text.includes(PROJECT_NAME_SECTION));
+  if (sectionIndex >= 0) {
+    const title = collectProjectNameFromTitle(paragraphs, sectionIndex);
+    if (title) return title;
   }
 
   const explanationIndex = paragraphs.findIndex((text) => /ПОЯСНЮВАЛЬНА\s+ЗАПИСКА/i.test(text));
   if (explanationIndex >= 0) {
-    const text = paragraphs[explanationIndex].replace(/^.*?ПОЯСНЮВАЛЬНА\s+ЗАПИСКА\s*/i, "").trim();
-    if (text && !/^(?:до|щодо)\s/i.test(text)) return { value: text, evidence: makeEvidence(paragraphs, explanationIndex, text) };
+    const firstPart = paragraphs[explanationIndex].replace(/^.*?ПОЯСНЮВАЛЬНА\s+ЗАПИСКА\s*/i, "").trim();
+    const projectName = collectWrappedProjectName(paragraphs, explanationIndex, firstPart);
+    if (projectName && !/^(?:до|щодо)\s/i.test(projectName.value)) return projectName;
   }
 
   const objectLabelIndex = paragraphs.findIndex((text) => /\(найменування\s+об['’ʼ]єкта\s+будівництва\)/i.test(text));
@@ -695,6 +695,69 @@ function findProjectName(paragraphs: string[]) {
     if (match) return { value: match[1].trim(), evidence: makeEvidence(paragraphs, objectLabelIndex, match[1].trim()) };
   }
   return undefined;
+}
+
+function collectProjectNameFromTitle(paragraphs: string[], sectionIndex: number) {
+  const firstText = paragraphs[sectionIndex];
+  const inlineMarker = firstText.match(new RegExp(`${escapeRegExp(PROJECT_NAME_SECTION)}[\\s\\S]*?№\\s*(.+?)\\s+Складений в поточних цінах`, "i"));
+  if (inlineMarker) {
+    const value = joinProjectNameParts([inlineMarker[1]]);
+    return value ? { value, evidence: makeEvidence(paragraphs, sectionIndex, value) } : undefined;
+  }
+
+  const sectionText = firstText.slice(firstText.indexOf(PROJECT_NAME_SECTION) + PROJECT_NAME_SECTION.length);
+  const numberIndex = sectionText.lastIndexOf("№");
+  const firstPart = numberIndex >= 0 ? sectionText.slice(numberIndex + 1).trim() : "";
+  const result = collectWrappedProjectName(paragraphs, sectionIndex, firstPart, /Складений\s+в\s+поточних\s+цінах/i, true);
+  if (!result) return undefined;
+  return { ...result, evidence: makeEvidence(paragraphs, sectionIndex, result.value) };
+}
+
+function collectWrappedProjectName(
+  paragraphs: string[],
+  startIndex: number,
+  firstPart: string,
+  endMarker = /^(?!)$/,
+  stripTitlePrefix = false,
+) {
+  const parts = firstPart ? [firstPart] : [];
+  let lastIndex = startIndex;
+
+  for (let index = startIndex + 1; index < paragraphs.length; index += 1) {
+    const text = paragraphs[index].trim();
+    if (!text) continue;
+    const markerIndex = text.search(endMarker);
+    if (markerIndex === 0 || (markerIndex < 0 && isProjectNameBoundary(text))) break;
+    const continuation = markerIndex >= 0 ? text.slice(0, markerIndex).trim() : text;
+    if (continuation) {
+      parts.push(stripTitlePrefix && parts.length === 0 ? stripProjectTitlePrefix(continuation) : continuation);
+    }
+    lastIndex = index;
+    if (markerIndex >= 0) break;
+  }
+
+  const value = joinProjectNameParts(parts);
+  if (!value) return undefined;
+  return { value, evidence: makeEvidence(paragraphs, lastIndex, value) };
+}
+
+function stripProjectTitlePrefix(value: string): string {
+  return value.replace(/^.*?будівництва\s*№\s*/i, "").trim();
+}
+
+function isProjectNameBoundary(text: string): boolean {
+  return /^(?:Будівництво\s+розташоване\s+на\s+території|Складений\s+в\s+поточних\s+цінах|Кошторисна\s+документац|Кошторисна\s+вартість|Всього\b|Усього\b|У\s+тому\s+числ|Примітка\s*:|Склав\b|Перевірив\b|Загальна\s+кошторисна|Нормативна\s+трудомісткість|Середньомісячна\s+заробітна|Вартість\s+матеріальних|При\s+складанні)/i.test(text);
+}
+
+function joinProjectNameParts(parts: string[]): string {
+  return parts
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([([{])\s+/g, "$1")
+    .replace(/\s+([)\]}])/g, "$1")
+    .trim();
 }
 
 function findApprovalSummaryTotal(paragraphs: string[]) {
