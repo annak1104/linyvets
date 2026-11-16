@@ -37,8 +37,8 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel("Головний інженер проєкту")).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByLabel(/Проєктна організація/)).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByText("Кошторис успішно прочитано")).toBeVisible();
-    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: Ігор ШЕВЧУК");
-    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Головний інженер проєкту: Ігор ШЕВЧУК");
+    await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: ФОП Шевчук І.В.");
+    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Головний інженер проєкту: Шевчук І.В.");
 
     await page.getByLabel("Абзац 3 · організація").fill("Організаційний абзац, відредагований вручну");
     await page.getByLabel(/Проєктна організація/).fill("Нове ім’я керівника");
@@ -142,5 +142,152 @@ test.describe("Лінивець complete workflow", () => {
 
     expect(downloadedPath).not.toBeNull();
     expect(documentXml(readFileSync(downloadedPath!)).replaceAll("&quot;", '"')).toContain(projectName);
+  });
+
+  test("generates the technical supervision calculation from the shared AVK-5 context", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("checkbox", { name: "Наказ про затвердження кошторису" }).uncheck({ force: true });
+    await page.getByRole("checkbox", { name: "Розрахунок вартості технічного нагляду" }).check({ force: true });
+
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
+    await (await chooser).setFiles(longProjectFixturePath);
+
+    await expect(page.getByRole("heading", { name: "Підтвердіть розрахунок технічного нагляду." })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel(/Всього по зведеному кошторисному розрахунку, грн/)).toHaveValue("264 325,00");
+    await expect(page.getByLabel(/Разом по главах 1–9, грн/)).toHaveValue("177 135,00");
+    await expect(page.getByLabel(/Розрахована вартість технічного нагляду, грн/)).toHaveValue("1 948,49");
+    await expect(page.getByRole("checkbox", { name: /актуальність реквізитів/i })).toHaveCount(0);
+    await expect(page.getByText("Перевірте актуальність реквізитів").first()).toBeVisible();
+
+    await page.getByLabel(/Номер договору/).fill("01/26");
+    await page.getByLabel(/Дата документа/).fill("12 травня 2026");
+    await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса");
+    await page.getByLabel(/Директор замовника/).fill("Директор");
+    await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса");
+    await page.getByLabel(/Посада виконавця/).fill("ФОП");
+    await page.getByLabel(/Підпис виконавця/).fill("Підписант");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Сформувати розрахунок" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain("rozrakhunok-tehnichnoho-nahliadu.docx");
+    const downloadedPath = await download.path();
+    expect(downloadedPath).not.toBeNull();
+    const xml = documentXml(readFileSync(downloadedPath!));
+    expect(xml).toContain("264 325,00");
+    expect(xml).toContain("177 135,00");
+    expect(xml).toContain("1 948,49");
+    expect(xml).toContain("12 травня 2026");
+    expect(xml).toContain("Замовник");
+    expect(xml).toContain("Підписант");
+    expect(xml).not.toContain("{{");
+    await expect(page.getByText("Розрахунок вартості технічного нагляду", { exact: true }).last()).toBeVisible();
+  });
+
+  test("generates the five-page technical supervision contract without reference party data", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("checkbox", { name: "Наказ про затвердження кошторису" }).uncheck({ force: true });
+    await page.getByRole("checkbox", { name: "Договір технічного нагляду" }).check({ force: true });
+
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
+    await (await chooser).setFiles(longProjectFixturePath);
+
+    await expect(page.getByRole("heading", { name: "Підтвердіть договір технічного нагляду." })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel(/Назва об’єкта/)).toHaveValue(/Поточний ремонт зупинки громадського транспорту/);
+    await expect(page.getByLabel(/Сума договору, грн/)).toHaveValue("1 948,49");
+    await expect(page.getByText(/історичне посилання/)).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /актуальність реквізитів/i })).toHaveCount(0);
+    await expect(page.getByText("Перевірте актуальність реквізитів").first()).toBeVisible();
+    await expect(page.locator('[aria-label="Попередній перегляд договору"]')).toContainText("1. Визначення окремих термінів договору.");
+    await expect(page.locator('[aria-label="Попередній перегляд договору"]')).toContainText("12. Юридичні адреси, банківські реквізити і підписи Сторін.");
+
+    await page.getByLabel(/Номер договору/).fill("02/26");
+    await page.getByLabel(/Дата договору/).fill("13 травня 2026");
+    await page.getByLabel(/Діє до/).fill("31.12.2026");
+    await page.getByLabel(/Назва замовника/).fill("Замовник для тесту");
+    await page.getByLabel(/Уповноважений представник замовника/).fill("Представник замовника");
+    await page.getByLabel(/Підстава повноважень замовника/).fill("Статут");
+    await page.getByLabel(/Назва виконавця/).fill("Виконавець для тесту");
+    await page.getByLabel(/Реєстраційні дані виконавця/).fill("Реєстраційні дані");
+    await page.getByLabel(/Кваліфікаційний сертифікат/).fill("АТ № 000000");
+    await page.getByLabel(/Податковий статус замовника/).fill("не є платником податку");
+    await page.getByLabel(/Податковий статус виконавця/).fill("є платником Єдиного податку 5%");
+    await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса\nРахунок");
+    await page.getByLabel(/Підпис замовника/).fill("Підпис замовника");
+    await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса\nРахунок");
+    await page.getByLabel(/Посада виконавця/).fill("ФОП");
+    await page.getByLabel(/Підпис виконавця/).fill("Підпис виконавця");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Сформувати договір" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain("dogovir-tekhnichnoho-nahliadu.docx");
+    const downloadedPath = await download.path();
+    expect(downloadedPath).not.toBeNull();
+    const xml = documentXml(readFileSync(downloadedPath!));
+    expect(xml).toContain("1 948,49");
+    expect(xml).toContain("Замовник для тесту");
+    expect(xml).toContain("Виконавець для тесту");
+    expect(xml).not.toContain("Шевчук Ігор");
+    expect(xml).not.toContain("UA113033980000026009500700621");
+    expect(xml).not.toContain("{{");
+    await expect(page.getByText("Договір технічного нагляду", { exact: true }).last()).toBeVisible();
+  });
+
+  test("generates all selected documents as one ZIP after independent review", async ({ page }) => {
+    const projectName = "Поточний ремонт зупинки громадського транспорту \"Мостозагін\", що на вул.Ківерцівська,біля будинку 9б (непарна сторона) в місті Луцьку Волинської області";
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Обрати всі" }).click();
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Завантажити файл кошторису" }).click();
+    await (await chooser).setFiles(longProjectFixturePath);
+
+    await expect(page.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("button", { name: "Сформувати ZIP" })).toBeVisible();
+
+    await page.getByRole("tab", { name: "Розрахунок вартості технічного нагляду" }).click();
+    await page.getByLabel(/Номер договору/).fill("01/26");
+    await page.getByLabel(/Дата документа/).fill("12 травня 2026");
+    await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса");
+    await page.getByLabel(/Директор замовника/).fill("Директор");
+    await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса");
+    await page.getByLabel(/Посада виконавця/).fill("ФОП");
+    await page.getByLabel(/Підпис виконавця/).fill("Підписант");
+
+    await page.getByRole("tab", { name: "Договір технічного нагляду" }).click();
+    await page.getByLabel(/Діє до/).fill("31.12.2026");
+    await page.getByLabel(/Назва замовника/).fill("Замовник для ZIP");
+    await page.getByLabel(/Уповноважений представник замовника/).fill("Представник");
+    await page.getByLabel(/Підстава повноважень замовника/).fill("Статут");
+    await page.getByLabel(/Назва виконавця/).fill("Виконавець для ZIP");
+    await page.getByLabel(/Реєстраційні дані виконавця/).fill("Реєстраційні дані");
+    await page.getByLabel(/Кваліфікаційний сертифікат/).fill("АТ № 000000");
+    await page.getByLabel(/Податковий статус замовника/).fill("не є платником податку");
+    await page.getByLabel(/Податковий статус виконавця/).fill("є платником Єдиного податку 5%");
+    await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса");
+    await page.getByLabel(/Підпис замовника/).fill("Директор");
+    await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса");
+    await page.getByLabel(/Посада виконавця/).fill("ФОП");
+    await page.getByLabel(/Підпис виконавця/).fill("Підписант");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Сформувати ZIP" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain("dokumenty.zip");
+    const downloadedPath = await download.path();
+    expect(downloadedPath).not.toBeNull();
+    const archive = new PizZip(readFileSync(downloadedPath!));
+    const entries = Object.keys(archive.files).filter((entry) => !entry.endsWith("/"));
+
+    expect(entries).toHaveLength(3);
+    expect(entries.join(" ")).toContain("nakaz");
+    expect(entries.join(" ")).toContain("rozrakhunok-tehnichnoho-nahliadu");
+    expect(entries.join(" ")).toContain("dogovir-tehnichnoho-nahliadu");
+    for (const entry of entries) expect(documentXml(archive.file(entry)!.asNodeBuffer()).replaceAll("&quot;", '"')).toContain(projectName);
+    await expect(page.getByText("Крок 3 · Пакет готовий")).toBeVisible();
+    await expect(page.getByRole("button", { name: /DOCX/ })).toHaveCount(3);
   });
 });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { normalizeOfficialOrderPersonName, officialOrderPersonValue } from "@/lib/official-order-person-mapping";
 import { parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
 
 export const DEFAULT_ORDER_PARAGRAPH = "Затвердити зведений кошторис вартості робіт (робочий проєкт):";
@@ -46,12 +47,34 @@ export const emptyOrderValues: OrderForm = {
 
 export type OrderParagraphValues = Pick<OrderForm, "orderParagraph1" | "orderParagraph2" | "orderParagraph3" | "orderParagraph4">;
 
-export function buildOrderParagraphs(values: Pick<OrderForm, "projectName" | "estimatedAmountThousandsUah" | "estimatedAmountInWords" | "projectOrganization" | "chiefProjectEngineer" | "certificate">): OrderParagraphValues {
+export type OrderSourcePeople = {
+  projectOrganizationHead?: string | null;
+  chiefProjectEngineer?: string | null;
+};
+
+function mappedRoleValue(
+  currentValue: string | null | undefined,
+  sourceValue: string | null | undefined,
+  role: "projectOrganizationHead" | "chiefProjectEngineer",
+): string {
+  const value = currentValue ?? "";
+  const mappedValue = officialOrderPersonValue(sourceValue, role);
+  if (mappedValue && normalizeOfficialOrderPersonName(value) === normalizeOfficialOrderPersonName(sourceValue ?? "")) {
+    return mappedValue;
+  }
+  return value;
+}
+
+export function buildOrderParagraphs(
+  values: Pick<OrderForm, "projectName" | "estimatedAmountThousandsUah" | "estimatedAmountInWords" | "projectOrganization" | "chiefProjectEngineer" | "certificate">,
+  sourcePeople?: OrderSourcePeople,
+): OrderParagraphValues {
   const projectParagraph = values.projectName && values.estimatedAmountThousandsUah && values.estimatedAmountInWords
     ? `${values.projectName} в сумі ${values.estimatedAmountThousandsUah} тис. грн. (${values.estimatedAmountInWords});`
     : "";
-  const organizationParagraph = `Проєктна організація: ${values.projectOrganization ?? ""}`;
-  const engineerName = values.chiefProjectEngineer ?? "";
+  const organizationName = mappedRoleValue(values.projectOrganization, sourcePeople?.projectOrganizationHead, "projectOrganizationHead");
+  const organizationParagraph = `Проєктна організація: ${organizationName}`;
+  const engineerName = mappedRoleValue(values.chiefProjectEngineer, sourcePeople?.chiefProjectEngineer, "chiefProjectEngineer");
   const certificate = engineerName && values.certificate ? ` (сертифікат ${values.certificate})` : "";
   const engineerParagraph = `Головний інженер проєкту: ${engineerName}${certificate}`;
 

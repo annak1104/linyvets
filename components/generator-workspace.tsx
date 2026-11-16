@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import {
   ArrowLeft,
   Check,
@@ -19,7 +19,13 @@ import {
 } from "lucide-react";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
+import { createEstimateContext } from "@/lib/documents/estimate-context";
+import { defaultSelectedDocumentIds, documentRegistry } from "@/lib/documents/registry";
+import type { DocumentId, EstimateContext } from "@/lib/documents/types";
+import { batchZipFilename } from "@/lib/batch-generation";
 import { buildOrderParagraphs, emptyOrderValues, orderSchema, type OrderForm } from "@/lib/order-form";
+import { buildTechnicalSupervisionCalculationDefaults, emptyTechnicalSupervisionCalculationValues, technicalSupervisionCalculationSchema, type TechnicalSupervisionCalculationForm } from "@/lib/technical-supervision-calculation";
+import { buildTechnicalSupervisionContractDefaults, emptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,6 +35,11 @@ import { SlothLogo } from "@/components/brand/sloth-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Stepper } from "@/components/stepper";
 import { ReviewEditStep } from "@/components/review-edit-step";
+import { DocumentSelector } from "@/components/document-selector";
+import { TechnicalSupervisionCalculationStep } from "@/components/technical-supervision-calculation-step";
+import { TechnicalSupervisionContractStep } from "@/components/technical-supervision-contract-step";
+import { BatchDownloadStep } from "@/components/batch-download-step";
+import { BatchGenerationBar, type BatchDocumentError } from "@/components/batch-generation-bar";
 
 type ParseEstimateResponse =
   | { result: Avk5ParseResult }
@@ -43,16 +54,84 @@ export function GeneratorWorkspace() {
   const [downloaded, setDownloaded] = useState(false);
   const [downloadFilename, setDownloadFilename] = useState("");
   const [parseResult, setParseResult] = useState<Avk5ParseResult | null>(null);
+  const [estimateContext, setEstimateContext] = useState<EstimateContext | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<DocumentId[]>(defaultSelectedDocumentIds);
+  const [activeDocumentId, setActiveDocumentId] = useState<DocumentId>("official-estimate-order");
+  const [generatedDocumentId, setGeneratedDocumentId] = useState<DocumentId>("official-estimate-order");
+  const [batchGenerated, setBatchGenerated] = useState(false);
+  const [batchDownloadFilename, setBatchDownloadFilename] = useState("");
+  const [batchDocumentIds, setBatchDocumentIds] = useState<DocumentId[]>([]);
+  const [batchErrors, setBatchErrors] = useState<BatchDocumentError[]>([]);
   const uploadAbortRef = useRef<AbortController | null>(null);
   const uploadRequestIdRef = useRef(0);
+  const generationRequestIdRef = useRef(0);
   const form = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
     defaultValues: emptyOrderValues,
     mode: "onBlur",
   });
+  const calculationForm = useForm<TechnicalSupervisionCalculationForm>({
+    resolver: zodResolver(technicalSupervisionCalculationSchema),
+    defaultValues: emptyTechnicalSupervisionCalculationValues,
+    mode: "onBlur",
+  });
+  const contractForm = useForm<TechnicalSupervisionContractForm>({
+    resolver: zodResolver(technicalSupervisionContractSchema),
+    defaultValues: emptyTechnicalSupervisionContractValues,
+    mode: "onBlur",
+  });
   const watchedEstimatedAmount = form.watch("estimatedAmountThousandsUah");
+  const watchedCalculationAmount = calculationForm.watch("supervisionAmountUah");
+  const watchedContractAmount = contractForm.watch("supervisionAmountUah");
+  const watchedCalculationValues = useWatch({ control: calculationForm.control });
+  const watchedContractValues = useWatch({ control: contractForm.control });
+
+  useEffect(() => {
+    const synced = syncContractFromCalculation(contractForm.getValues(), watchedCalculationValues);
+    const dirtyFields = contractForm.formState.dirtyFields;
+    const sharedFields: (keyof TechnicalSupervisionContractForm)[] = ["projectName", "chapters1To9TotalUah", "customerProfileId", "contractorProfileId", "customerName", "contractorName", "contractorRegistrationDetails", "contractNumber", "documentDate", "customerDetails", "customerRepresentative", "customerSignature", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "calculationRatePercent"];
+    for (const field of sharedFields) {
+      if (!dirtyFields[field]) contractForm.setValue(field, synced[field], { shouldDirty: false, shouldValidate: false });
+    }
+    if (!dirtyFields.supervisionAmountUah) contractForm.setValue("supervisionAmountUah", synced.supervisionAmountUah, { shouldDirty: false, shouldValidate: false });
+    if (!dirtyFields.supervisionAmountInWords) contractForm.setValue("supervisionAmountInWords", synced.supervisionAmountInWords, { shouldDirty: false, shouldValidate: false });
+  }, [contractForm, watchedCalculationValues]);
+
+  useEffect(() => {
+    const dirtyFields = calculationForm.formState.dirtyFields;
+    const sharedFields: Array<[keyof TechnicalSupervisionCalculationForm, keyof TechnicalSupervisionContractForm]> = [
+      ["projectName", "projectName"],
+      ["chapters1To9TotalUah", "chapters1To9TotalUah"],
+      ["customerProfileId", "customerProfileId"],
+      ["contractorProfileId", "contractorProfileId"],
+      ["contractNumber", "contractNumber"],
+      ["documentDate", "documentDate"],
+      ["customerDetails", "customerDetails"],
+      ["customerDirector", "customerRepresentative"],
+      ["contractorDetails", "contractorDetails"],
+      ["contractorSignatureTitle", "contractorSignatureTitle"],
+      ["contractorSignature", "contractorSignature"],
+      ["calculationRatePercent", "calculationRatePercent"],
+    ];
+    for (const [calculationField, contractField] of sharedFields) {
+      if (!dirtyFields[calculationField]) calculationForm.setValue(calculationField, watchedContractValues[contractField] ?? "", { shouldDirty: false, shouldValidate: false });
+    }
+    if (!dirtyFields.supervisionAmountUah) calculationForm.setValue("supervisionAmountUah", watchedContractValues.supervisionAmountUah ?? "", { shouldDirty: false, shouldValidate: false });
+    if (!dirtyFields.supervisionAmountInWords) calculationForm.setValue("supervisionAmountInWords", watchedContractValues.supervisionAmountInWords ?? "", { shouldDirty: false, shouldValidate: false });
+  }, [calculationForm, watchedContractValues]);
+
+  const handleDocumentSelection = (ids: DocumentId[]) => {
+    setSelectedDocumentIds(ids);
+    setBatchGenerated(false);
+    setBatchErrors([]);
+    if (ids.length > 0 && !ids.includes(activeDocumentId)) setActiveDocumentId(ids[0]);
+  };
 
   const handleFile = async (file: File) => {
+    if (selectedDocumentIds.length === 0) {
+      setErrorMessage("Оберіть щонайменше один доступний документ перед завантаженням кошторису.");
+      return;
+    }
     uploadAbortRef.current?.abort();
     const requestId = ++uploadRequestIdRef.current;
     const controller = new AbortController();
@@ -61,7 +140,15 @@ export function GeneratorWorkspace() {
     setParseResult(null);
     setDownloaded(false);
     setDownloadFilename("");
+    setBatchGenerated(false);
+    setBatchDownloadFilename("");
+    setBatchDocumentIds([]);
+    setBatchErrors([]);
+    generationRequestIdRef.current += 1;
     form.reset(emptyOrderValues);
+    calculationForm.reset(emptyTechnicalSupervisionCalculationValues);
+      contractForm.reset(emptyTechnicalSupervisionContractValues);
+    setEstimateContext(null);
     setSelectedFile(file);
     setIsParsing(true);
 
@@ -81,16 +168,27 @@ export function GeneratorWorkspace() {
 
       if (requestId !== uploadRequestIdRef.current) return;
       const result = payload.result;
-      const amountText = result.data.finalEstimatedTotalThousandsUahText ?? "";
+      const context = createEstimateContext(result, file.name);
+      setEstimateContext(context);
+      const calculationDefaults = buildTechnicalSupervisionCalculationDefaults(context);
+      calculationForm.reset(calculationDefaults);
+      contractForm.reset(buildTechnicalSupervisionContractDefaults(context, calculationDefaults));
+      const amountText = context.totals.final.value?.text ?? "";
       const nextValues: OrderForm = {
         ...emptyOrderValues,
-        projectName: result.data.projectName ?? "",
-        projectOrganization: result.data.projectOrganization ?? "",
-        chiefProjectEngineer: result.data.chiefProjectEngineer ?? "",
+        projectName: context.project.name.value ?? "",
+        projectOrganization: context.people.projectOrganizationHead.value ?? "",
+        chiefProjectEngineer: context.people.chiefProjectEngineer.value ?? "",
         estimatedAmountThousandsUah: amountText,
         estimatedAmountInWords: amountText ? amountInWordsUkrainian(amountText) : "",
       };
-      form.reset({ ...nextValues, ...buildOrderParagraphs(nextValues) });
+      form.reset({
+        ...nextValues,
+        ...buildOrderParagraphs(nextValues, {
+          projectOrganizationHead: context.people.projectOrganizationHead.value,
+          chiefProjectEngineer: context.people.chiefProjectEngineer.value,
+        }),
+      });
       setParseResult(result);
       setStep(2);
     } catch (error) {
@@ -105,9 +203,16 @@ export function GeneratorWorkspace() {
     }
   };
 
-  const handleGenerate = async (values: OrderForm) => {
+  const handleGenerateOrder = async (values: OrderForm) => {
+    if (!selectedDocumentIds.includes("official-estimate-order")) {
+      setErrorMessage("Оберіть офіційний наказ, щоб сформувати доступний DOCX-документ.");
+      return;
+    }
+    const requestId = ++generationRequestIdRef.current;
     setErrorMessage("");
     setDownloaded(false);
+    setBatchGenerated(false);
+    setGeneratedDocumentId("official-estimate-order");
     setIsGenerating(true);
     try {
       const response = await fetch("/api/generate-order", {
@@ -122,6 +227,7 @@ export function GeneratorWorkspace() {
       }
 
       const blob = await response.blob();
+      if (requestId !== generationRequestIdRef.current) return;
       const contentDisposition = response.headers.get("Content-Disposition") ?? "";
       const encodedFilename = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
       let filename = "avk-5-order.docx";
@@ -143,9 +249,229 @@ export function GeneratorWorkspace() {
       setDownloadFilename(filename);
       setStep(3);
     } catch (error) {
+      if (requestId !== generationRequestIdRef.current) return;
       setErrorMessage(error instanceof Error ? error.message : "Не вдалося сформувати DOCX. Спробуйте ще раз.");
     } finally {
-      setIsGenerating(false);
+      if (requestId === generationRequestIdRef.current) setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateCalculation = async (values: TechnicalSupervisionCalculationForm) => {
+    const requestId = ++generationRequestIdRef.current;
+    setErrorMessage("");
+    setDownloaded(false);
+    setBatchGenerated(false);
+    setGeneratedDocumentId("technical-supervision-calculation");
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-technical-supervision-calculation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(payload?.error?.message ?? "Не вдалося сформувати розрахунок технічного нагляду.");
+      }
+
+      const blob = await response.blob();
+      if (requestId !== generationRequestIdRef.current) return;
+      const contentDisposition = response.headers.get("Content-Disposition") ?? "";
+      const encodedFilename = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      let filename = "technical-supervision-calculation.docx";
+      if (encodedFilename) {
+        try {
+          filename = decodeURIComponent(encodedFilename);
+        } catch {
+          filename = "technical-supervision-calculation.docx";
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setDownloaded(true);
+      setDownloadFilename(filename);
+      setStep(3);
+    } catch (error) {
+      if (requestId !== generationRequestIdRef.current) return;
+      setErrorMessage(error instanceof Error ? error.message : "Не вдалося сформувати розрахунок технічного нагляду. Спробуйте ще раз.");
+    } finally {
+      if (requestId === generationRequestIdRef.current) setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateContract = async (values: TechnicalSupervisionContractForm) => {
+    if (!selectedDocumentIds.includes("technical-supervision-contract")) {
+      setErrorMessage("Оберіть договір технічного нагляду, щоб сформувати доступний DOCX-документ.");
+      return;
+    }
+    const requestId = ++generationRequestIdRef.current;
+    setErrorMessage("");
+    setDownloaded(false);
+    setBatchGenerated(false);
+    setGeneratedDocumentId("technical-supervision-contract");
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-technical-supervision-contract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(payload?.error?.message ?? "Не вдалося сформувати договір технічного нагляду.");
+      }
+      const blob = await response.blob();
+      if (requestId !== generationRequestIdRef.current) return;
+      const contentDisposition = response.headers.get("Content-Disposition") ?? "";
+      const encodedFilename = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      let filename = "technical-supervision-contract.docx";
+      if (encodedFilename) {
+        try {
+          filename = decodeURIComponent(encodedFilename);
+        } catch {
+          filename = "technical-supervision-contract.docx";
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setDownloaded(true);
+      setDownloadFilename(filename);
+      setStep(3);
+    } catch (error) {
+      if (requestId !== generationRequestIdRef.current) return;
+      setErrorMessage(error instanceof Error ? error.message : "Не вдалося сформувати договір технічного нагляду. Спробуйте ще раз.");
+    } finally {
+      if (requestId === generationRequestIdRef.current) setIsGenerating(false);
+    }
+  };
+
+  const validateBatchDocuments = async () => {
+    const errors: BatchDocumentError[] = [];
+    for (const id of selectedDocumentIds) {
+      const valid = id === "official-estimate-order"
+        ? await form.trigger()
+        : id === "technical-supervision-calculation"
+          ? await calculationForm.trigger()
+          : await contractForm.trigger();
+      if (!valid) {
+        errors.push({
+          id,
+          message: id === "official-estimate-order"
+            ? "Заповніть обов’язкові поля наказу."
+            : id === "technical-supervision-calculation"
+              ? "Підтвердіть обов’язкові реквізити розрахунку."
+              : "Підтвердіть обов’язкові реквізити договору.",
+        });
+      }
+    }
+
+    setBatchErrors(errors);
+    if (errors.length > 0) {
+      setActiveDocumentId(errors[0].id);
+      setStep(2);
+      return null;
+    }
+
+    return selectedDocumentIds.map((id) => ({
+      id,
+      data: id === "official-estimate-order"
+        ? form.getValues()
+        : id === "technical-supervision-calculation"
+          ? calculationForm.getValues()
+          : contractForm.getValues(),
+    }));
+  };
+
+  const handleGenerateBatch = async () => {
+    if (selectedDocumentIds.length < 2) return;
+    const documents = await validateBatchDocuments();
+    if (!documents) return;
+
+    const requestId = ++generationRequestIdRef.current;
+    setErrorMessage("");
+    setDownloaded(false);
+    setBatchErrors([]);
+    setIsGenerating(true);
+    try {
+      const response = await fetch("/api/generate-documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documents }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: { message?: string; documents?: BatchDocumentError[] } } | null;
+        if (requestId !== generationRequestIdRef.current) return;
+        setBatchErrors(payload?.error?.documents ?? []);
+        throw new Error(payload?.error?.message ?? "Не вдалося сформувати пакет документів.");
+      }
+      const blob = await response.blob();
+      if (requestId !== generationRequestIdRef.current) return;
+      const filename = responseFilename(response, batchZipFilename(String(documents[0]?.data && typeof documents[0].data === "object" && "projectName" in documents[0].data ? documents[0].data.projectName : "")));
+      downloadBlob(blob, filename);
+      setBatchGenerated(true);
+      setBatchDocumentIds([...selectedDocumentIds]);
+      setBatchDownloadFilename(filename);
+      setDownloaded(true);
+      setDownloadFilename(filename);
+      setStep(3);
+    } catch (error) {
+      if (requestId !== generationRequestIdRef.current) return;
+      setErrorMessage(error instanceof Error ? error.message : "Не вдалося сформувати пакет документів. Спробуйте ще раз.");
+    } finally {
+      if (requestId === generationRequestIdRef.current) setIsGenerating(false);
+    }
+  };
+
+  const handleDownloadIndividualFromBatch = async (id: DocumentId) => {
+    const valid = id === "official-estimate-order"
+      ? await form.trigger()
+      : id === "technical-supervision-calculation"
+        ? await calculationForm.trigger()
+        : await contractForm.trigger();
+    if (!valid) {
+      setBatchErrors([{ id, message: "Виправте обов’язкові поля цього документа перед завантаженням." }]);
+      setActiveDocumentId(id);
+      setStep(2);
+      return;
+    }
+
+    const requestId = ++generationRequestIdRef.current;
+    setErrorMessage("");
+    setIsGenerating(true);
+    try {
+      const endpoint = id === "official-estimate-order"
+        ? "/api/generate-order"
+        : id === "technical-supervision-calculation"
+          ? "/api/generate-technical-supervision-calculation"
+          : "/api/generate-technical-supervision-contract";
+      const data = id === "official-estimate-order"
+        ? form.getValues()
+        : id === "technical-supervision-calculation"
+          ? calculationForm.getValues()
+          : contractForm.getValues();
+      const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+        throw new Error(payload?.error?.message ?? "Не вдалося сформувати DOCX.");
+      }
+      const blob = await response.blob();
+      if (requestId !== generationRequestIdRef.current) return;
+      downloadBlob(blob, responseFilename(response, "document.docx"));
+    } catch (error) {
+      if (requestId !== generationRequestIdRef.current) return;
+      setErrorMessage(error instanceof Error ? error.message : "Не вдалося сформувати DOCX. Спробуйте ще раз.");
+    } finally {
+      if (requestId === generationRequestIdRef.current) setIsGenerating(false);
     }
   };
 
@@ -157,8 +483,19 @@ export function GeneratorWorkspace() {
     setDownloaded(false);
     setDownloadFilename("");
     setParseResult(null);
+    setEstimateContext(null);
+    setSelectedDocumentIds(defaultSelectedDocumentIds);
+    setActiveDocumentId("official-estimate-order");
+    setGeneratedDocumentId("official-estimate-order");
+    setBatchGenerated(false);
+    setBatchDownloadFilename("");
+    setBatchDocumentIds([]);
+    setBatchErrors([]);
     setErrorMessage("");
+    generationRequestIdRef.current += 1;
     form.reset(emptyOrderValues);
+    calculationForm.reset(emptyTechnicalSupervisionCalculationValues);
+    contractForm.reset(emptyTechnicalSupervisionContractValues);
   };
 
   return (
@@ -188,6 +525,8 @@ export function GeneratorWorkspace() {
             </div>
           </div>
 
+          <DocumentSelector selectedDocumentIds={selectedDocumentIds} onChange={handleDocumentSelection} />
+
           <div className="mb-7 rounded-2xl border bg-card px-4 py-4 surface-shadow sm:mb-8 sm:px-6">
             <Stepper currentStep={step} />
           </div>
@@ -199,26 +538,74 @@ export function GeneratorWorkspace() {
             </div>
           )}
 
-          {step === 1 && <UploadStep isParsing={isParsing} selectedFile={selectedFile} onFile={(file) => void handleFile(file)} />}
+          {step === 1 && <UploadStep isParsing={isParsing} selectedFile={selectedFile} uploadDisabled={selectedDocumentIds.length === 0} onFile={(file) => void handleFile(file)} />}
           {step === 2 && (
-            <ReviewEditStep
-              form={form}
-              parseResult={parseResult}
-              isGenerating={isGenerating}
-              selectedFile={selectedFile}
-              onBack={() => setStep(1)}
-              onInvalid={() => setErrorMessage("Перевірте обов’язкові поля перед формуванням документа.")}
-              onSubmit={handleGenerate}
-            />
+            <>
+              {selectedDocumentIds.length > 1 && <DocumentTabs selectedDocumentIds={selectedDocumentIds} activeDocumentId={activeDocumentId} onChange={setActiveDocumentId} />}
+              <BatchGenerationBar selectedDocumentIds={selectedDocumentIds} errors={batchErrors} isGenerating={isGenerating} onGenerate={() => void handleGenerateBatch()} />
+              {activeDocumentId === "technical-supervision-calculation" ? (
+                <TechnicalSupervisionCalculationStep
+                  form={calculationForm}
+                  estimateContext={estimateContext}
+                  isGenerating={isGenerating}
+                  selectedFile={selectedFile}
+                  onBack={() => setStep(1)}
+                  onInvalid={() => setErrorMessage("Підтвердіть обов’язкові реквізити розрахунку перед формуванням DOCX.")}
+                  onSubmit={handleGenerateCalculation}
+                />
+              ) : activeDocumentId === "technical-supervision-contract" ? (
+                <TechnicalSupervisionContractStep
+                  form={contractForm}
+                  estimateContext={estimateContext}
+                  isGenerating={isGenerating}
+                  selectedFile={selectedFile}
+                  onBack={() => setStep(1)}
+                  onInvalid={() => setErrorMessage("Підтвердіть обов’язкові реквізити договору перед формуванням DOCX.")}
+                  onSubmit={handleGenerateContract}
+                />
+              ) : (
+                <ReviewEditStep
+                  form={form}
+                  parseResult={parseResult}
+                  estimateContext={estimateContext}
+                  isGenerating={isGenerating}
+                  selectedFile={selectedFile}
+                  generationAvailable={selectedDocumentIds.includes("official-estimate-order")}
+                  onBack={() => setStep(1)}
+                  onInvalid={() => setErrorMessage("Перевірте обов’язкові поля перед формуванням документа.")}
+                  onSubmit={handleGenerateOrder}
+                />
+              )}
+            </>
           )}
-          {step === 3 && <DownloadStep downloaded={downloaded} filename={downloadFilename} estimatedAmount={watchedEstimatedAmount} isGenerating={isGenerating} onBack={() => setStep(2)} onRestart={restart} onDownload={() => void handleGenerate(form.getValues())} />}
+          {step === 3 && batchGenerated ? <BatchDownloadStep documentIds={batchDocumentIds} zipFilename={batchDownloadFilename} isGenerating={isGenerating} onBack={() => { setStep(2); }} onRestart={restart} onDownloadZip={() => void handleGenerateBatch()} onDownloadIndividual={(id) => void handleDownloadIndividualFromBatch(id)} /> : step === 3 && <DownloadStep documentName={generatedDocumentId === "technical-supervision-calculation" ? "Розрахунок вартості технічного нагляду" : generatedDocumentId === "technical-supervision-contract" ? "Договір технічного нагляду" : "Офіційний наказ"} downloaded={downloaded} filename={downloadFilename} estimatedAmount={generatedDocumentId === "technical-supervision-calculation" ? watchedCalculationAmount : generatedDocumentId === "technical-supervision-contract" ? watchedContractAmount : watchedEstimatedAmount} isGenerating={isGenerating} onBack={() => { setActiveDocumentId(generatedDocumentId); setStep(2); }} onRestart={restart} onDownload={() => void (generatedDocumentId === "technical-supervision-calculation" ? handleGenerateCalculation(calculationForm.getValues()) : generatedDocumentId === "technical-supervision-contract" ? handleGenerateContract(contractForm.getValues()) : handleGenerateOrder(form.getValues()))} />}
         </div>
       </div>
     </main>
   );
 }
 
-function UploadStep({ isParsing, selectedFile, onFile }: { isParsing: boolean; selectedFile: File | null; onFile: (file: File) => void }) {
+function responseFilename(response: Response, fallback: string): string {
+  const contentDisposition = response.headers.get("Content-Disposition") ?? "";
+  const encodedFilename = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (!encodedFilename) return fallback;
+  try {
+    return decodeURIComponent(encodedFilename);
+  } catch {
+    return fallback;
+  }
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function UploadStep({ isParsing, selectedFile, uploadDisabled, onFile }: { isParsing: boolean; selectedFile: File | null; uploadDisabled: boolean; onFile: (file: File) => void }) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
@@ -240,7 +627,7 @@ function UploadStep({ isParsing, selectedFile, onFile }: { isParsing: boolean; s
               <p className="mt-5 text-sm font-semibold">Читаємо {selectedFile?.name}</p>
               <p className="mt-1 text-sm text-muted-foreground">Готуємо реквізити наказу для перевірки…</p>
             </div>
-          ) : <FileDropzone onFile={onFile} />}
+          ) : <FileDropzone disabled={uploadDisabled} onFile={onFile} />}
           <div className="mt-5 flex items-start gap-2 text-xs leading-5 text-muted-foreground"><FileWarning className="mt-0.5 size-3.5 shrink-0 text-primary-hover" /><span>До 4 МБ · лише RTF. Файл обробляється в пам’яті й не зберігається.</span></div>
         </div>
       </div>
@@ -248,11 +635,16 @@ function UploadStep({ isParsing, selectedFile, onFile }: { isParsing: boolean; s
   );
 }
 
+function DocumentTabs({ selectedDocumentIds, activeDocumentId, onChange }: { selectedDocumentIds: readonly DocumentId[]; activeDocumentId: DocumentId; onChange: (id: DocumentId) => void }) {
+  const documents = documentRegistry.filter((document) => selectedDocumentIds.includes(document.id));
+  return <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Документи для редагування">{documents.map((document) => <button key={document.id} type="button" role="tab" aria-selected={activeDocumentId === document.id} className={`focus-ring rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${activeDocumentId === document.id ? "border-primary bg-accent text-primary-hover" : "bg-card text-muted-foreground hover:bg-accent"}`} onClick={() => onChange(document.id)}>{document.name}</button>)}</div>;
+}
+
 function TrustRow({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
   return <div className="flex items-start gap-3"><div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl bg-accent text-primary-hover">{icon}</div><div><p className="text-sm font-semibold">{title}</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{description}</p></div></div>;
 }
 
-function DownloadStep({ downloaded, filename, estimatedAmount, isGenerating, onBack, onRestart, onDownload }: { downloaded: boolean; filename: string; estimatedAmount: string; isGenerating: boolean; onBack: () => void; onRestart: () => void; onDownload: () => void }) {
+function DownloadStep({ documentName, downloaded, filename, estimatedAmount, isGenerating, onBack, onRestart, onDownload }: { documentName: string; downloaded: boolean; filename: string; estimatedAmount: string; isGenerating: boolean; onBack: () => void; onRestart: () => void; onDownload: () => void }) {
   return (
     <Card className="overflow-hidden">
       <div className="grid gap-8 p-7 sm:p-10 lg:grid-cols-[1fr_0.92fr] lg:gap-12 lg:p-12">
@@ -267,8 +659,8 @@ function DownloadStep({ downloaded, filename, estimatedAmount, isGenerating, onB
         </div>
         <div className="rounded-[26px] border bg-background p-5 sm:p-6">
           <div className="rounded-2xl border bg-card p-5 surface-shadow sm:p-6">
-            <div className="flex items-start justify-between gap-4 border-b pb-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary-hover"><FileText className="size-5" /></div><div><p className="text-sm font-semibold">Офіційний наказ</p><p className="mt-1 text-xs text-muted-foreground">Реквізити кошторису</p></div></div><Badge className="bg-accent text-success">DOCX</Badge></div>
-            <div className="space-y-4 py-5"><SummaryRow label="Статус" value="Підготовлено" success /><SummaryRow label="Фінальна сума" value={estimatedAmount ? `${estimatedAmount} тис. грн` : "Не визначено"} /></div>
+            <div className="flex items-start justify-between gap-4 border-b pb-5"><div className="flex items-center gap-3"><div className="flex size-10 items-center justify-center rounded-xl bg-accent text-primary-hover"><FileText className="size-5" /></div><div><p className="text-sm font-semibold">{documentName}</p><p className="mt-1 text-xs text-muted-foreground">Документ на основі кошторису</p></div></div><Badge className="bg-accent text-success">DOCX</Badge></div>
+            <div className="space-y-4 py-5"><SummaryRow label="Статус" value="Підготовлено" success /><SummaryRow label="Сума" value={estimatedAmount ? `${estimatedAmount} ${documentName === "Офіційний наказ" ? "тис. грн" : "грн"}` : "Не визначено"} /></div>
             <div className="border-t pt-5"><div className="flex items-center justify-between text-xs text-muted-foreground"><span>Готовність</span><span>100%</span></div><Progress className="mt-2" value={100} /></div>
           </div>
           <p className="mt-4 flex items-start gap-2 px-1 text-xs leading-5 text-muted-foreground"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-success" />Документ сформовано без постійного зберігання.</p>

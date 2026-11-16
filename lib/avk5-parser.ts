@@ -11,7 +11,10 @@ export type Avk5EvidenceSection =
   | "chief-engineer"
   | "project-organization"
   | "prepared-by"
-  | "organization-placeholder";
+  | "organization-placeholder"
+  | "chapters1-to-9-total"
+  | "source-supervision-rate"
+  | "source-supervision-allowance";
 
 export type Avk5DocumentType =
   | "local-estimate"
@@ -55,6 +58,10 @@ export interface Avk5EstimateData {
   projectOrganization: string | null;
   chiefProjectEngineer: string | null;
   preparedBy: string | null;
+  /** Semantic AVK-5 source values kept additive for backwards compatibility. */
+  chapters1To9TotalThousandsUah?: number | null;
+  sourceSupervisionRatePercent?: number | null;
+  sourceSupervisionAllowanceThousandsUah?: number | null;
   items: Avk5EstimateItem[];
   itemsTotalThousandsUah: number | null;
 }
@@ -227,6 +234,9 @@ function extractAvk5Data(
   const estimateNumberMatch = findEstimateNumber(paragraphs);
   const preparedByMatch = findPreparedBy(paragraphs);
   const finalTotalMatch = AVK5_DOCUMENT_ADAPTERS[documentType].findFinalTotal(paragraphs);
+  const chapters1To9Match = findChapters1To9Total(paragraphs);
+  const sourceSupervisionRateMatch = findSourceSupervisionRate(paragraphs);
+  const sourceSupervisionAllowanceMatch = findSourceSupervisionAllowance(paragraphs);
 
   if (projectNameMatch) {
     evidence.push({ section: "project-name", label: PROJECT_NAME_SECTION, ...projectNameMatch.evidence });
@@ -262,6 +272,18 @@ function extractAvk5Data(
 
   if (finalTotalMatch && documentType !== "consolidated-estimate") {
     evidence.push({ section: "final-total", label: "Підсумок документа", ...finalTotalMatch.evidence });
+  }
+
+  if (chapters1To9Match) {
+    evidence.push({ section: "chapters1-to-9-total", label: "Разом по главах 1-9", ...chapters1To9Match.evidence });
+  }
+
+  if (sourceSupervisionRateMatch) {
+    evidence.push({ section: "source-supervision-rate", label: "Технічний нагляд у джерелі", ...sourceSupervisionRateMatch.evidence });
+  }
+
+  if (sourceSupervisionAllowanceMatch) {
+    evidence.push({ section: "source-supervision-allowance", label: "Кошти на здійснення технічного нагляду", ...sourceSupervisionAllowanceMatch.evidence });
   }
 
   for (const [index, item] of items.entries()) {
@@ -320,6 +342,9 @@ function extractAvk5Data(
     projectOrganization: organizationMatch?.value ?? null,
     chiefProjectEngineer: engineerMatch?.value ?? null,
     preparedBy: preparedByMatch?.value ?? null,
+    chapters1To9TotalThousandsUah: chapters1To9Match?.value ?? null,
+    sourceSupervisionRatePercent: sourceSupervisionRateMatch?.value ?? null,
+    sourceSupervisionAllowanceThousandsUah: sourceSupervisionAllowanceMatch?.value ?? null,
     items,
     itemsTotalThousandsUah,
   };
@@ -793,6 +818,41 @@ function findExplanatoryTotal(paragraphs: string[]) {
   const match = text.match(/у тому числ[іi]:\s*(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})\s*тис\./i);
   if (!match) return undefined;
   return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, index, match[0]) };
+}
+
+function findChapters1To9Total(paragraphs: string[]) {
+  for (const [index, text] of paragraphs.entries()) {
+    const match = text.match(/разом\s+по\s+главах\s*1\s*-\s*9\s*:?\s*([\d .]+[.,]\d{3})/i);
+    if (match) {
+      return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, index, match[0]) };
+    }
+  }
+  return undefined;
+}
+
+function findSourceSupervisionRate(paragraphs: string[]) {
+  for (const [index, text] of paragraphs.entries()) {
+    if (!/здійснення\s+технічного\s+нагляду/i.test(text)) continue;
+    const match = text.match(/здійснення\s+технічного\s+нагляду[\s\S]{0,120}?(\d+(?:[.,]\d+)?)\s*%/i);
+    if (match) {
+      const value = Number(match[1].replace(",", "."));
+      if (Number.isFinite(value)) return { value, sourceText: match[0], evidence: makeEvidence(paragraphs, index, match[0]) };
+    }
+  }
+  return undefined;
+}
+
+function findSourceSupervisionAllowance(paragraphs: string[]) {
+  for (const [index, text] of paragraphs.entries()) {
+    const labelMatch = text.match(/кошти\s+на\s+здійснення\s+технічного\s+нагляду/i);
+    if (!labelMatch || labelMatch.index === undefined) continue;
+    const afterLabel = text.slice(labelMatch.index + labelMatch[0].length);
+    const match = afterLabel.match(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})/);
+    if (match) {
+      return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, index, match[0]) };
+    }
+  }
+  return undefined;
 }
 
 function findChiefEngineer(paragraphs: string[]) {

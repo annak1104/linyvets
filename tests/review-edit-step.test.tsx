@@ -7,6 +7,8 @@ import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
+import { createEstimateContext } from "@/lib/documents/estimate-context";
+import type { EstimateContext } from "@/lib/documents/types";
 import { emptyOrderValues, orderSchema, type OrderForm } from "@/lib/order-form";
 import { ReviewEditStep } from "@/components/review-edit-step";
 
@@ -46,7 +48,10 @@ const parseResult: Avk5ParseResult = {
   },
 };
 
-function ReviewHarness({ emptyRequiredFields = false, onSubmit = vi.fn(async () => undefined), onInvalid }: { emptyRequiredFields?: boolean; onSubmit?: (values: OrderForm) => Promise<void>; onInvalid?: (errors: Parameters<NonNullable<React.ComponentProps<typeof ReviewEditStep>["onInvalid"]>>[0]) => void }) {
+function ReviewHarness({ emptyRequiredFields = false, mappedSource = false, onSubmit = vi.fn(async () => undefined), onInvalid }: { emptyRequiredFields?: boolean; mappedSource?: boolean; onSubmit?: (values: OrderForm) => Promise<void>; onInvalid?: (errors: Parameters<NonNullable<React.ComponentProps<typeof ReviewEditStep>["onInvalid"]>>[0]) => void }) {
+  const estimateContext: EstimateContext | null = mappedSource
+    ? createEstimateContext({ ...parseResult, data: { ...parseResult.data, projectOrganization: "Ігор ШЕВЧУК" } }, "estimate.rtf")
+    : null;
   const form = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
@@ -54,6 +59,7 @@ function ReviewHarness({ emptyRequiredFields = false, onSubmit = vi.fn(async () 
       projectName: emptyRequiredFields ? "" : parseResult.data.projectName ?? "",
       estimatedAmountThousandsUah: emptyRequiredFields ? "" : "197,271",
       estimatedAmountInWords: emptyRequiredFields ? "" : "Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.",
+      projectOrganization: mappedSource ? "Ігор ШЕВЧУК" : "",
       chiefProjectEngineer: parseResult.data.chiefProjectEngineer ?? "",
     },
     mode: "onBlur",
@@ -63,6 +69,7 @@ function ReviewHarness({ emptyRequiredFields = false, onSubmit = vi.fn(async () 
     <ReviewEditStep
       form={form}
       parseResult={parseResult}
+      estimateContext={estimateContext}
       isGenerating={false}
       selectedFile={new File(["rtf"], "estimate.rtf", { type: "application/rtf" })}
       onBack={vi.fn()}
@@ -138,6 +145,29 @@ describe("ReviewEditStep", () => {
     await waitFor(() => {
       expect(screen.getByDisplayValue("Власний абзац організації")).toBeTruthy();
       expect(screen.getByDisplayValue("Власний абзац інженера")).toBeTruthy();
+    });
+  });
+
+  it("keeps mapped defaults aligned between the fields and live preview after source-based initialization", async () => {
+    render(<ReviewHarness mappedSource />);
+
+    await waitFor(() => {
+      expect((screen.getByLabelText("Абзац 3 · організація") as HTMLTextAreaElement).value).toBe("Проєктна організація: ФОП Шевчук І.В.");
+      expect((screen.getByLabelText("Абзац 4 · інженер") as HTMLTextAreaElement).value).toBe("Головний інженер проєкту: Шевчук І.В.");
+    });
+
+    const preview = screen.getByLabelText("Попередній перегляд документа");
+    expect(preview.textContent).toContain("Проєктна організація: ФОП Шевчук І.В.");
+    expect(preview.textContent).toContain("Головний інженер проєкту: Шевчук І.В.");
+
+    fireEvent.change(screen.getByLabelText("Абзац 3 · організація"), { target: { value: "Власний абзац організації" } });
+    fireEvent.change(screen.getByLabelText("Абзац 4 · інженер"), { target: { value: "Власний абзац інженера" } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Власний абзац організації")).toBeTruthy();
+      expect(screen.getByDisplayValue("Власний абзац інженера")).toBeTruthy();
+      expect(preview.textContent).toContain("Власний абзац організації");
+      expect(preview.textContent).toContain("Власний абзац інженера");
     });
   });
 });

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
+import type { EstimateContext } from "@/lib/documents/types";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 import { buildOrderParagraphs, type OrderForm } from "@/lib/order-form";
 import { Badge } from "@/components/ui/badge";
@@ -27,8 +28,10 @@ import { Textarea } from "@/components/ui/textarea";
 type ReviewEditStepProps = {
   form: UseFormReturn<OrderForm>;
   parseResult: Avk5ParseResult | null;
+  estimateContext?: EstimateContext | null;
   isGenerating: boolean;
   selectedFile: File | null;
+  generationAvailable?: boolean;
   onBack: () => void;
   onSubmit: (values: OrderForm) => Promise<void>;
   onInvalid?: (errors: FieldErrors<OrderForm>) => void;
@@ -37,8 +40,10 @@ type ReviewEditStepProps = {
 export function ReviewEditStep({
   form,
   parseResult,
+  estimateContext,
   isGenerating,
   selectedFile,
+  generationAvailable = true,
   onBack,
   onSubmit,
   onInvalid,
@@ -71,13 +76,16 @@ export function ReviewEditStep({
   }, [amount, form]);
 
   useEffect(() => {
-    const generated = buildOrderParagraphs(values);
+    const generated = buildOrderParagraphs(values, {
+      projectOrganizationHead: estimateContext?.people.projectOrganizationHead.value,
+      chiefProjectEngineer: estimateContext?.people.chiefProjectEngineer.value,
+    });
     for (const key of ["orderParagraph2", "orderParagraph3", "orderParagraph4"] as const) {
       if (!form.formState.dirtyFields[key] && form.getValues(key) !== generated[key]) {
         form.setValue(key, generated[key], { shouldDirty: false, shouldValidate: false });
       }
     }
-  }, [form, form.formState.dirtyFields, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
+  }, [estimateContext, form, form.formState.dirtyFields, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
 
   return (
     <form noValidate onSubmit={form.handleSubmit(onSubmit, onInvalid)}>
@@ -92,7 +100,7 @@ export function ReviewEditStep({
               </div>
               <div className="flex w-fit items-center gap-2 rounded-xl border bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
                 <FileSpreadsheet className="size-4 text-primary-hover" />
-                <span className="max-w-[190px] truncate">{selectedFile?.name ?? "кошторис"}</span>
+                <span className="max-w-[190px] truncate">{estimateContext?.source.fileName ?? selectedFile?.name ?? "кошторис"}</span>
               </div>
             </div>
           </div>
@@ -145,7 +153,7 @@ export function ReviewEditStep({
             <div className="flex items-start gap-2 rounded-xl bg-background px-3 py-2.5 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 size-3.5 shrink-0 text-primary-hover" />Відредаговані значення зберігаються під час переходу між кроками.</div>
           </div>
 
-          <div className="flex flex-col-reverse justify-between gap-3 border-t bg-background px-6 py-5 sm:flex-row sm:items-center sm:px-8"><Button type="button" variant="ghost" onClick={onBack}><ArrowLeft className="size-4" /> Назад</Button><Button type="submit" variant="primary" disabled={isGenerating}>{isGenerating ? <LoaderCircle className="size-4 animate-spin" /> : <FileCheck2 className="size-4" />}{isGenerating ? "Формуємо документ…" : "Сформувати AVK-5"}<ArrowRight className="size-4" /></Button></div>
+          <div className="flex flex-col-reverse justify-between gap-3 border-t bg-background px-6 py-5 sm:flex-row sm:items-center sm:px-8"><Button type="button" variant="ghost" onClick={onBack}><ArrowLeft className="size-4" /> Назад</Button><Button type="submit" variant="primary" disabled={isGenerating || !generationAvailable}>{isGenerating ? <LoaderCircle className="size-4 animate-spin" /> : <FileCheck2 className="size-4" />}{isGenerating ? "Формуємо документ…" : generationAvailable ? "Сформувати AVK-5" : "Оберіть доступний документ"}<ArrowRight className="size-4" /></Button></div>
         </Card>
 
         <OrderPreview values={values} />

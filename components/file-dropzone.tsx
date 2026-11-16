@@ -4,32 +4,33 @@ import { useRef, useState } from "react";
 import { FileText, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function FileDropzone({ onFile }: { onFile: (file: File) => void }) {
+export function FileDropzone({ onFile, disabled = false }: { onFile: (file: File) => void; disabled?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const acceptFile = (file?: File) => {
-    if (file) onFile(file);
+    if (file && !disabled) onFile(file);
   };
 
   return (
     <div
-      className={cn("group cursor-pointer rounded-[26px] border border-dashed bg-accent/45 p-7 text-center transition-colors hover:border-primary hover:bg-accent sm:p-10", isDragging && "border-primary bg-accent")}
-      onClick={() => inputRef.current?.click()}
-      onDragEnter={(event) => { event.preventDefault(); setIsDragging(true); }}
+      className={cn("group cursor-pointer rounded-[26px] border border-dashed bg-accent/45 p-7 text-center transition-colors hover:border-primary hover:bg-accent sm:p-10", isDragging && "border-primary bg-accent", disabled && "cursor-not-allowed opacity-60 hover:border-border hover:bg-accent/45")}
+      onClick={() => { if (!disabled) inputRef.current?.click(); }}
+      onDragEnter={(event) => { event.preventDefault(); if (!disabled) setIsDragging(true); }}
       onDragOver={(event) => event.preventDefault()}
       onDragLeave={() => setIsDragging(false)}
-      onDrop={(event) => { event.preventDefault(); setIsDragging(false); acceptFile(event.dataTransfer.files?.[0]); }}
+      onDrop={(event) => { event.preventDefault(); setIsDragging(false); if (!disabled) acceptFile(event.dataTransfer.files?.[0]); }}
       role="button"
       tabIndex={0}
       aria-label="Завантажити файл кошторису"
-      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") inputRef.current?.click(); }}
+      onKeyDown={(event) => { if (!disabled && (event.key === "Enter" || event.key === " ")) inputRef.current?.click(); }}
     >
       <input
         ref={inputRef}
         className="sr-only"
         type="file"
         accept=".rtf,application/rtf,text/rtf"
+        disabled={disabled}
         onChange={(event) => {
           acceptFile(event.target.files?.[0]);
           event.currentTarget.value = "";
