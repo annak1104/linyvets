@@ -36,6 +36,19 @@ export const HISTORICAL_CONTRACTOR_TAX_STATUS = "є платником Єдин�
 export const EMPTY_CONTRACT_NUMBER_PLACEHOLDER = "__________";
 export const EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER = "«____» __________ 2026 року";
 export const EMPTY_CONTRACT_END_DATE_PLACEHOLDER = "**.**.2026";
+const KYIV_TIME_ZONE = "Europe/Kyiv";
+
+export function getKyivCurrentYear(now: Date = new Date()): number {
+  const yearPart = new Intl.DateTimeFormat("en-US", { timeZone: KYIV_TIME_ZONE, year: "numeric" })
+    .formatToParts(now)
+    .find((part) => part.type === "year")?.value;
+  if (!yearPart) throw new Error("Не вдалося визначити поточний рік у часовому поясі Europe/Kyiv");
+  return Number(yearPart);
+}
+
+export function getDefaultContractEndDate(now: Date = new Date()): string {
+  return `31.12.${getKyivCurrentYear(now)}`;
+}
 
 export const technicalSupervisionContractSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
@@ -102,6 +115,13 @@ export const emptyTechnicalSupervisionContractValues: TechnicalSupervisionContra
   contractorSignature: "",
 };
 
+export function createEmptyTechnicalSupervisionContractValues(now: Date = new Date()): TechnicalSupervisionContractForm {
+  return {
+    ...emptyTechnicalSupervisionContractValues,
+    contractEndDate: getDefaultContractEndDate(now),
+  };
+}
+
 function derivedValues(data: Pick<TechnicalSupervisionContractForm, "chapters1To9TotalUah" | "calculationRatePercent">) {
   const amount = calculateSupervisionAmountKopecks(data.chapters1To9TotalUah, data.calculationRatePercent);
   return {
@@ -118,14 +138,13 @@ export function buildTechnicalSupervisionContractDefaults(
   const customer = getCustomerProfile(calculation?.customerProfileId ?? calculationDefaults.customerProfileId);
   const contractor = getContractorProfile(calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId);
   const values: TechnicalSupervisionContractForm = {
-    ...emptyTechnicalSupervisionContractValues,
+    ...createEmptyTechnicalSupervisionContractValues(),
     projectName: calculation?.projectName ?? calculationDefaults.projectName,
     chapters1To9TotalUah: calculation?.chapters1To9TotalUah ?? calculationDefaults.chapters1To9TotalUah,
     customerProfileId: calculation?.customerProfileId ?? calculationDefaults.customerProfileId,
     contractorProfileId: calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId,
     contractNumber: calculation?.contractNumber ?? "",
     documentDate: calculation?.documentDate ?? "",
-    contractEndDate: "",
     customerName: customer.legalName,
     customerDetails: calculation?.customerDetails ?? formatPartyDetails(customer),
     customerRepresentative: calculation?.customerDirector ?? customer.representativeName,

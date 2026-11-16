@@ -37,7 +37,7 @@ describe("POST /api/generate-technical-supervision-contract", () => {
     expect(xml).toContain(defaults.contractorAuthorizationBasis);
     expect(xml).toContain("№ 01/26");
     expect(xml).toContain("«12 травня 2026»");
-    expect(xml).toContain(EMPTY_CONTRACT_END_DATE_PLACEHOLDER);
+    expect(xml).toContain(defaults.contractEndDate);
     expect(xml).toContain(defaults.appendixReference);
     expect(xml).toContain("11.6. Замовник своїм підписом підтверджує, що він не є платником податку, Виконавець своїм підписом підтверджує, що він є платником Єдиного податку 5%.");
     expect(xml).not.toContain("що він що він");
@@ -90,6 +90,7 @@ describe("POST /api/generate-technical-supervision-contract", () => {
     const values = {
       ...buildTechnicalSupervisionContractDefaults(context),
       contractNumber: "01/26",
+      contractEndDate: "",
       contractorCertificate: "АТ № 007622",
       customerTaxStatus: "потребує підтвердження",
       contractorTaxStatus: "потребує підтвердження",

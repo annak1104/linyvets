@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TechnicalSupervisionContractStep } from "@/components/technical-supervision-contract-step";
 import type { EstimateContext } from "@/lib/documents/types";
-import { buildTechnicalSupervisionContractDefaults, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractDefaults, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, getDefaultContractEndDate, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 
 const context: EstimateContext = {
   source: { fileName: "67_КД_ЗКР.rtf", format: "rtf", documentType: "consolidated-estimate", extractionStatus: "extracted", evidence: [{ section: "source-supervision-rate", label: "Технічний нагляд у джерелі", paragraphIndex: 1, text: "1,5 %", matchedText: "1,5 %" }], warnings: [], errors: [] },
@@ -38,6 +38,8 @@ describe("TechnicalSupervisionContractStep", () => {
     expect(screen.getByLabelText(/Податковий статус замовника/)).toHaveProperty("value", "не є платником податку");
     expect(screen.getByLabelText(/Податковий статус виконавця/)).toHaveProperty("value", "є платником Єдиного податку 5%");
     expect(screen.getByLabelText(/Кваліфікаційний сертифікат/)).toHaveProperty("value", "АТ № 007622");
+    expect(screen.getByLabelText(/Діє до/)).toHaveProperty("value", getDefaultContractEndDate());
+    expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain(getDefaultContractEndDate());
     expect(screen.getAllByText("Історичний шаблон — перевірте")).toHaveLength(2);
     expect(screen.getByText(/історичне посилання/)).toBeTruthy();
     expect(screen.getByText(/1,5 %/)).toBeTruthy();
@@ -52,6 +54,9 @@ describe("TechnicalSupervisionContractStep", () => {
     await waitFor(() => expect(screen.getByLabelText(/Сума договору, грн/)).toHaveProperty("value", "2 657,03"));
     expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain("2 657,03");
     expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain("11.6. Замовник своїм підписом підтверджує, що він не є платником податку, Виконавець своїм підписом підтверджує, що він є платником Єдиного податку 5%.");
+
+    fireEvent.change(screen.getByLabelText(/Діє до/), { target: { value: "" } });
+    expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain(EMPTY_CONTRACT_END_DATE_PLACEHOLDER);
   });
 
   it("submits with profile-backed legal data without extra confirmation controls", async () => {
@@ -69,11 +74,13 @@ describe("TechnicalSupervisionContractStep", () => {
 
     const selector = screen.getByLabelText("Профіль виконавця");
     fireEvent.change(screen.getByLabelText(/Реквізити виконавця/), { target: { value: "Власні реквізити" } });
+    fireEvent.change(screen.getByLabelText(/Діє до/), { target: { value: "30.06.2027" } });
     fireEvent.change(selector, { target: { value: "ik-zahid" } });
 
     expect(confirm).toHaveBeenCalledOnce();
     expect((screen.getByLabelText("Профіль виконавця") as HTMLSelectElement).value).toBe("fop-shevchuk");
     expect((screen.getByLabelText(/Реквізити виконавця/) as HTMLTextAreaElement).value).toBe("Власні реквізити");
+    expect((screen.getByLabelText(/Діє до/) as HTMLInputElement).value).toBe("30.06.2027");
 
     confirm.mockReturnValue(true);
     fireEvent.change(selector, { target: { value: "ik-zahid" } });

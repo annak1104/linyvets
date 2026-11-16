@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
 import type { ContractorProfileId } from "@/lib/party-profiles";
-import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, EMPTY_CONTRACT_NUMBER_PLACEHOLDER, EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER, HISTORICAL_CONTRACTOR_TAX_STATUS, HISTORICAL_CUSTOMER_TAX_STATUS, emptyTechnicalSupervisionContractValues, technicalSupervisionContractSchema } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, createEmptyTechnicalSupervisionContractValues, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, EMPTY_CONTRACT_NUMBER_PLACEHOLDER, EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER, getDefaultContractEndDate, HISTORICAL_CONTRACTOR_TAX_STATUS, HISTORICAL_CUSTOMER_TAX_STATUS, emptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema } from "@/lib/technical-supervision-contract";
 import { loadTechnicalSupervisionContractTemplate } from "@/lib/technical-supervision-contract-template";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
 
@@ -29,8 +29,31 @@ describe("technical supervision contract", () => {
     expect(defaults.customerLegalBasis).toBe("Положення про департамент, затверджене рішенням Луцької міської ради від 29.06.2017 № 26/12");
     expect(defaults.customerTaxStatus).toBe(HISTORICAL_CUSTOMER_TAX_STATUS);
     expect(defaults.contractorTaxStatus).toBe(HISTORICAL_CONTRACTOR_TAX_STATUS);
-    expect(defaults.contractEndDate).toBe("");
+    expect(defaults.contractEndDate).toBe(getDefaultContractEndDate());
     expect(defaults.appendixReference).toBe("Розрахунок кошторисної вартості технічного нагляду");
+  });
+
+  it("uses the Europe/Kyiv calendar year, including the year boundary", () => {
+    expect(getDefaultContractEndDate(new Date("2026-12-31T21:59:59.000Z"))).toBe("31.12.2026");
+    expect(getDefaultContractEndDate(new Date("2026-12-31T22:00:00.000Z"))).toBe("31.12.2027");
+    expect(getDefaultContractEndDate(new Date("2027-06-30T20:59:59.000Z"))).toBe("31.12.2027");
+    expect(getDefaultContractEndDate(new Date("2028-12-31T21:59:59.000Z"))).toBe("31.12.2028");
+  });
+
+  it("defaults only new forms and preserves manual or cleared dates during synchronization", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/67_КД_ЗКР.rtf")));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+    const freshValues = createEmptyTechnicalSupervisionContractValues(new Date("2027-01-01T00:00:00.000Z"));
+
+    expect(freshValues.contractEndDate).toBe("31.12.2027");
+
+    const defaults = buildTechnicalSupervisionContractDefaults(context);
+    const manuallyEdited = syncContractFromCalculation({ ...defaults, contractEndDate: "30.06.2027" }, { projectName: "Оновлений проєкт" });
+    const manuallyCleared = syncContractFromCalculation({ ...defaults, contractEndDate: "" }, { projectName: "Оновлений проєкт" });
+
+    expect(manuallyEdited.contractEndDate).toBe("30.06.2027");
+    expect(manuallyCleared.contractEndDate).toBe("");
+    expect(buildTechnicalSupervisionContractTemplateValues(manuallyCleared).contractEndDate).toBe(EMPTY_CONTRACT_END_DATE_PLACEHOLDER);
   });
 
   it("maps each contractor profile to its own authorization and certificate data", async () => {
@@ -81,7 +104,7 @@ describe("technical supervision contract", () => {
     };
 
     expect(technicalSupervisionContractSchema.safeParse(requiredValues).success).toBe(true);
-    const emptyTemplateValues = buildTechnicalSupervisionContractTemplateValues(requiredValues);
+    const emptyTemplateValues = buildTechnicalSupervisionContractTemplateValues({ ...requiredValues, contractEndDate: "" });
     expect(emptyTemplateValues.contractNumber).toBe(EMPTY_CONTRACT_NUMBER_PLACEHOLDER);
     expect(emptyTemplateValues.documentDate).toBe(EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER);
     expect(emptyTemplateValues.contractEndDate).toBe(EMPTY_CONTRACT_END_DATE_PLACEHOLDER);

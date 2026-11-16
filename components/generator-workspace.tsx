@@ -25,7 +25,7 @@ import type { DocumentId, EstimateContext } from "@/lib/documents/types";
 import { batchZipFilename } from "@/lib/batch-generation";
 import { buildOrderParagraphs, emptyOrderValues, officialOrderCertificateValue, orderSchema, type OrderForm } from "@/lib/order-form";
 import { buildTechnicalSupervisionCalculationDefaults, emptyTechnicalSupervisionCalculationValues, technicalSupervisionCalculationSchema, type TechnicalSupervisionCalculationForm } from "@/lib/technical-supervision-calculation";
-import { buildTechnicalSupervisionContractDefaults, emptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractDefaults, createEmptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -77,7 +77,7 @@ export function GeneratorWorkspace() {
   });
   const contractForm = useForm<TechnicalSupervisionContractForm>({
     resolver: zodResolver(technicalSupervisionContractSchema),
-    defaultValues: emptyTechnicalSupervisionContractValues,
+    defaultValues: createEmptyTechnicalSupervisionContractValues(),
     mode: "onBlur",
   });
   const watchedEstimatedAmount = form.watch("estimatedAmountThousandsUah");
@@ -147,7 +147,7 @@ export function GeneratorWorkspace() {
     generationRequestIdRef.current += 1;
     form.reset(emptyOrderValues);
     calculationForm.reset(emptyTechnicalSupervisionCalculationValues);
-      contractForm.reset(emptyTechnicalSupervisionContractValues);
+    contractForm.reset(createEmptyTechnicalSupervisionContractValues());
     setEstimateContext(null);
     setSelectedFile(file);
     setIsParsing(true);
@@ -494,7 +494,7 @@ export function GeneratorWorkspace() {
     generationRequestIdRef.current += 1;
     form.reset(emptyOrderValues);
     calculationForm.reset(emptyTechnicalSupervisionCalculationValues);
-    contractForm.reset(emptyTechnicalSupervisionContractValues);
+    contractForm.reset(createEmptyTechnicalSupervisionContractValues());
   };
 
   return (

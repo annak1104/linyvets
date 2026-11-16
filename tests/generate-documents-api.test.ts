@@ -157,6 +157,7 @@ describe("POST /api/generate-documents", () => {
     expect(response.status).toBe(200);
     expect(entries).toHaveLength(1);
     expect(xml).toContain(contract.contractorName);
+    expect(xml).toContain(contract.contractEndDate);
     if (contract.contractorCertificate) expect(xml).toContain(contract.contractorCertificate);
     expect(xml).not.toContain("та , з другої сторони");
     expect(xml).not.toContain("{{");
