@@ -134,6 +134,12 @@ export function ReviewEditStep({
                 <Field label="Сертифікат" hint={officialOrderCertificateHint(values.certificate, values.chiefProjectEngineer, estimateContext?.people.chiefProjectEngineer.value, Boolean(form.formState.dirtyFields.certificate))}>
                   <Input {...form.register("certificate")} placeholder="Не зазначено у джерелі" />
                 </Field>
+                <Field label="Посада підписанта замовника" hint={signatoryFieldHint(values.customerSignatureTitle, Boolean(form.formState.dirtyFields.customerSignatureTitle))}>
+                  <Input {...form.register("customerSignatureTitle")} />
+                </Field>
+                <Field label="Ім’я підписанта замовника" hint={signatoryFieldHint(values.customerSignature, Boolean(form.formState.dirtyFields.customerSignature))}>
+                  <Input {...form.register("customerSignature")} />
+                </Field>
                 <Field label="Сума українською" hint="Автоматично">
                   <Textarea className="min-h-24 bg-background" readOnly {...form.register("estimatedAmountInWords")} placeholder="З’явиться після введення суми" />
                 </Field>
@@ -185,7 +191,7 @@ function OrderPreview({ values }: { values: OrderForm }) {
             <p className="pl-5">{values.orderParagraph3 || <span className="text-slate-400">Абзац про організацію</span>}</p>
             <p className="pl-5">{values.orderParagraph4 || <span className="text-slate-400">Абзац про інженера</span>}</p>
           </div>
-          <div className="mt-20 flex items-end justify-between gap-5 text-[12px]"><span>Директор департаменту</span><span className="font-semibold">Василь ЛІЩУК</span></div>
+          <div className="mt-20 flex items-end justify-between gap-5 text-[12px]"><span>{values.customerSignatureTitle ? `${values.customerSignatureTitle} департаменту` : "Посада департаменту"}</span><span className="font-semibold">{values.customerSignature || "Підписант"}</span></div>
           <p className="mt-14 text-[11px]">Яворський Віктор&nbsp;&nbsp;773 162</p>
         </div>
       </div>
@@ -258,6 +264,11 @@ function fieldStateHint(sourceValue: string | number | null | undefined, edited:
 function officialOrderCertificateHint(currentValue: string, currentEngineer: string, sourceEngineer: string | null | undefined, edited: boolean): string {
   if (edited) return "Змінено вручну";
   return officialOrderCertificateValue(currentEngineer, sourceEngineer) && currentValue.trim() ? "Автозаповнено з профілю" : "Не знайдено у джерелі";
+}
+
+function signatoryFieldHint(value: string, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value.trim() ? "Автозаповнено з підписанта" : "Потрібно ввести вручну";
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {

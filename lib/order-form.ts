@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { officialOrderPersonCertificate, officialOrderPersonProfileId, officialOrderPersonValue } from "@/lib/official-order-person-mapping";
+import { customerSignatoryIdSchema, defaultCustomerSignatoryId, getCustomerSignatory } from "@/lib/party-profiles";
 import { parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
 
 export const DEFAULT_ORDER_PARAGRAPH = "Затвердити зведений кошторис вартості робіт (робочий проєкт):";
@@ -18,6 +19,9 @@ const amountSchema = z.string()
   }, "Введіть коректну суму, наприклад 197,271");
 
 export const orderSchema = z.object({
+  customerSignatoryId: customerSignatoryIdSchema,
+  customerSignatureTitle: z.string(),
+  customerSignature: z.string(),
   projectName: z.string().trim().min(2, "Додайте назву об’єкта"),
   projectOrganization: z.string(),
   chiefProjectEngineer: z.string(),
@@ -33,6 +37,9 @@ export const orderSchema = z.object({
 export type OrderForm = z.infer<typeof orderSchema>;
 
 export const emptyOrderValues: OrderForm = {
+  customerSignatoryId: defaultCustomerSignatoryId,
+  customerSignatureTitle: getCustomerSignatory(defaultCustomerSignatoryId).position,
+  customerSignature: getCustomerSignatory(defaultCustomerSignatoryId).displayName,
   projectName: "",
   projectOrganization: "",
   chiefProjectEngineer: "",

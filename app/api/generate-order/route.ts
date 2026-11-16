@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createOfficialOrderDocx, OfficialOrderTemplateError } from "@/lib/official-order-template";
 import { orderSchema } from "@/lib/order-form";
+import { normalizeProfilePayload } from "@/lib/party-profiles";
 import { safeOrderFilename } from "@/lib/safe-filename";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     return errorResponse(400, "INVALID_JSON", "Не вдалося прочитати дані форми.");
   }
 
-  const parsed = orderSchema.safeParse(payload);
+  const parsed = orderSchema.safeParse(normalizeProfilePayload(payload));
   if (!parsed.success) {
     return errorResponse(400, "INVALID_ORDER_DATA", "Перевірте обов’язкові поля перед формуванням DOCX.");
   }

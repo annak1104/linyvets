@@ -59,5 +59,44 @@ describe("GeneratorWorkspace document session", () => {
     expect(screen.getByLabelText(/Сертифікат/)).toHaveProperty("value", "АТ № 007622");
     expect(screen.getByText("Автозаповнено з профілю")).toBeTruthy();
   });
+
+  it("synchronizes the selected customer signatory across all document forms and protects manual overrides", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<ThemeProvider><GeneratorWorkspace /></ThemeProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Обрати всі" }));
+    const dropzone = screen.getByRole("button", { name: "Завантажити файл кошторису" });
+    const input = dropzone.querySelector("input[type=file]");
+    if (!input) throw new Error("Upload input not found");
+
+    fireEvent.change(input, { target: { files: [new File(["{\\rtf1}"], "estimate.rtf", { type: "application/rtf" })] } });
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Перевірте наказ перед формуванням." })).toBeTruthy());
+
+    const selector = screen.getByLabelText("Підписант замовника") as HTMLSelectElement;
+    expect(selector.value).toBe("director-lishchuk");
+    fireEvent.change(selector, { target: { value: "acting-havryliuk" } });
+    expect((screen.getByLabelText(/Посада підписанта замовника/) as HTMLInputElement).value).toBe("В.о. директора");
+    expect((screen.getByLabelText(/Ім’я підписанта замовника/) as HTMLInputElement).value).toBe("Гаврилюк С.В.");
+
+    fireEvent.change(screen.getByLabelText(/Ім’я підписанта замовника/), { target: { value: "Ручний підпис" } });
+    fireEvent.change(selector, { target: { value: "acting-hrelia" } });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(selector.value).toBe("acting-havryliuk");
+    expect((screen.getByLabelText(/Ім’я підписанта замовника/) as HTMLInputElement).value).toBe("Ручний підпис");
+
+    confirm.mockReturnValue(true);
+    fireEvent.change(selector, { target: { value: "acting-hrelia" } });
+    expect((screen.getByLabelText(/Ім’я підписанта замовника/) as HTMLInputElement).value).toBe("Греля А.Ю.");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Розрахунок вартості технічного нагляду" }));
+    expect((screen.getByLabelText(/ПІБ підписанта замовника/) as HTMLInputElement).value).toBe("Греля А.Ю.");
+    expect((screen.getByLabelText(/Посада підписанта замовника/) as HTMLInputElement).value).toBe("В.о. директора");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Договір технічного нагляду" }));
+    expect((screen.getByLabelText(/Уповноважений представник замовника/) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/Підстава повноважень замовника/) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/Посада замовника/) as HTMLInputElement).value).toBe("В.о. директора");
+    expect((screen.getByLabelText(/Підпис замовника/) as HTMLInputElement).value).toBe("Греля А.Ю.");
+    confirm.mockRestore();
+  });
 });
 

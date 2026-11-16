@@ -74,6 +74,10 @@ def create_template(source: Path, destination: Path) -> None:
         replace_paragraph_text(paragraphs[18], "{{orderParagraph3}}")
         replace_paragraph_text(paragraphs[19], "{{orderParagraph4}}")
         replace_paragraph_text(
+            paragraphs[23],
+            "{{customerSignatureTitle}} департаменту                                                               {{customerSignature}}",
+        )
+        replace_paragraph_text(
             paragraphs[15],
             "{{projectName}}{{estimatedAmount}}{{estimatedAmountInWords}}{{projectOrganization}}{{chiefProjectEngineer}}{{certificate}}",
             hidden=True,

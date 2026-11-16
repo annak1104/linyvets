@@ -14,6 +14,9 @@ const localEstimatePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-0
 const longProjectEstimatePath = resolve(process.cwd(), "reference/67_КД_ЗКР.rtf");
 
 const editedOrder: OrderForm = {
+  customerSignatoryId: "director-lishchuk",
+  customerSignatureTitle: "Директор",
+  customerSignature: "Ліщук В.Я.",
   projectName: "Новий проєкт / об’єкт: 2026",
   projectOrganization: "ТОВ «Нова організація»",
   chiefProjectEngineer: "Ігор ШЕВЧУК",
@@ -114,7 +117,7 @@ describe("POST /api/generate-order", () => {
     expect(xml).not.toContain("Шевчук І.В.");
     expect(xml).not.toContain("012269");
     expect(xml).toContain("ЛУЦЬКА  МІСЬКА  РАДА");
-    expect(xml).toContain("Василь Л");
+    expect(xml).toContain("Ліщук В.Я.");
 
     expect(sha256(packagePart(document, "word/media/image1.png"))).toBe(
       sha256(packagePart(source, "word/media/image1.png")),

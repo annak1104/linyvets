@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
 import type { ContractorProfileId } from "@/lib/party-profiles";
+import { customerSignatories } from "@/lib/party-profiles";
 import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, createEmptyTechnicalSupervisionContractValues, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, EMPTY_CONTRACT_NUMBER_PLACEHOLDER, EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER, getDefaultContractEndDate, HISTORICAL_CONTRACTOR_TAX_STATUS, HISTORICAL_CUSTOMER_TAX_STATUS, emptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema } from "@/lib/technical-supervision-contract";
 import { loadTechnicalSupervisionContractTemplate } from "@/lib/technical-supervision-contract-template";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
@@ -90,6 +91,20 @@ describe("technical supervision contract", () => {
     expect(technicalSupervisionContractSchema.safeParse({ ...tovWithoutCertificate, contractorCertificate: "" }).success).toBe(true);
     expect(buildTechnicalSupervisionContractTemplateValues({ ...tovWithoutCertificate, contractorCertificate: "" }).contractorCertificateClause).toBe("");
     expect(buildTechnicalSupervisionContractTemplateValues({ ...tovWithoutCertificate, contractorCertificate: "АТ № ручний" }).contractorCertificateClause).toBe(" та АТ № ручний");
+  });
+
+  it("uses the approved full name only for the default director and clears unknown acting details", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/67_КД_ЗКР.rtf")));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+
+    for (const signatory of customerSignatories) {
+      const values = buildTechnicalSupervisionContractDefaults(context, { customerSignatoryId: signatory.id });
+      expect(values.customerSignatoryId).toBe(signatory.id);
+      expect(values.customerSignatureTitle).toBe(signatory.position);
+      expect(values.customerSignature).toBe(signatory.displayName);
+      expect(values.customerRepresentative).toBe(signatory.fullName ?? "");
+      expect(values.customerLegalBasis).toBe(signatory.authorizationBasis ?? "");
+    }
   });
 
   it("accepts empty, partially completed, and fully completed contract details", async () => {

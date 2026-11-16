@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   contractorProfiles,
   customerProfile,
+  customerSignatories,
+  defaultCustomerSignatoryId,
   formatPartyDetails,
   getContractorProfile,
+  getCustomerSignatory,
 } from "@/lib/party-profiles";
 
 describe("configured party profiles", () => {
@@ -91,5 +94,30 @@ describe("configured party profiles", () => {
     expect(getContractorProfile("ik-zahid").certificate).toBeNull();
     expect(getContractorProfile("probudkontrol").taxStatus).toBeNull();
     expect(getContractorProfile("ik-zahid").taxStatus).toBeNull();
+  });
+
+  it("contains the three approved customer signatories with no invented acting-director data", () => {
+    expect(customerSignatories).toHaveLength(3);
+    expect(getCustomerSignatory(defaultCustomerSignatoryId)).toEqual({
+      id: "director-lishchuk",
+      position: "Директор",
+      displayName: "Ліщук В.Я.",
+      fullName: "Ліщук Василь Ярославович",
+      authorizationBasis: customerProfile.authorizationBasis?.value,
+    });
+    expect(getCustomerSignatory("acting-havryliuk")).toEqual({
+      id: "acting-havryliuk",
+      position: "В.о. директора",
+      displayName: "Гаврилюк С.В.",
+      fullName: null,
+      authorizationBasis: null,
+    });
+    expect(getCustomerSignatory("acting-hrelia")).toEqual({
+      id: "acting-hrelia",
+      position: "В.о. директора",
+      displayName: "Греля А.Ю.",
+      fullName: null,
+      authorizationBasis: null,
+    });
   });
 });

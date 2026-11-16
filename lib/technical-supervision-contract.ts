@@ -4,11 +4,14 @@ import type { EstimateContext } from "@/lib/documents/types";
 import {
   contractorProfileIdSchema,
   customerProfileIdSchema,
+  customerSignatoryIdSchema,
+  defaultCustomerSignatoryId,
   defaultContractorProfileId,
   defaultCustomerProfileId,
   formatPartyDetails,
   getContractorProfile,
   getCustomerProfile,
+  getCustomerSignatory,
 } from "@/lib/party-profiles";
 import {
   buildTechnicalSupervisionCalculationDefaults,
@@ -53,6 +56,7 @@ export function getDefaultContractEndDate(now: Date = new Date()): string {
 export const technicalSupervisionContractSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
   customerProfileId: customerProfileIdSchema,
+  customerSignatoryId: customerSignatoryIdSchema,
   contractorProfileId: contractorProfileIdSchema,
   chapters1To9TotalUah: decimalText,
   contractNumber: optionalText,
@@ -89,6 +93,7 @@ export type TechnicalSupervisionContractForm = z.infer<typeof technicalSupervisi
 export const emptyTechnicalSupervisionContractValues: TechnicalSupervisionContractForm = {
   projectName: "",
   customerProfileId: defaultCustomerProfileId,
+  customerSignatoryId: defaultCustomerSignatoryId,
   contractorProfileId: defaultContractorProfileId,
   chapters1To9TotalUah: "",
   contractNumber: "",
@@ -108,7 +113,7 @@ export const emptyTechnicalSupervisionContractValues: TechnicalSupervisionContra
   contractorTaxStatus: HISTORICAL_CONTRACTOR_TAX_STATUS,
   appendixReference: CONTRACT_APPENDIX_REFERENCE,
   customerDetails: "",
-  customerSignatureTitle: "Директор",
+  customerSignatureTitle: getCustomerSignatory(defaultCustomerSignatoryId).position,
   customerSignature: "",
   contractorDetails: "",
   contractorSignatureTitle: "",
@@ -137,21 +142,24 @@ export function buildTechnicalSupervisionContractDefaults(
   const calculationDefaults = buildTechnicalSupervisionCalculationDefaults(context);
   const customer = getCustomerProfile(calculation?.customerProfileId ?? calculationDefaults.customerProfileId);
   const contractor = getContractorProfile(calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId);
+  const signatory = getCustomerSignatory(calculation?.customerSignatoryId ?? defaultCustomerSignatoryId);
+  const hasExplicitSignatory = calculation?.customerSignatoryId !== undefined;
   const values: TechnicalSupervisionContractForm = {
     ...createEmptyTechnicalSupervisionContractValues(),
     projectName: calculation?.projectName ?? calculationDefaults.projectName,
     chapters1To9TotalUah: calculation?.chapters1To9TotalUah ?? calculationDefaults.chapters1To9TotalUah,
     customerProfileId: calculation?.customerProfileId ?? calculationDefaults.customerProfileId,
+    customerSignatoryId: calculation?.customerSignatoryId ?? defaultCustomerSignatoryId,
     contractorProfileId: calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId,
     contractNumber: calculation?.contractNumber ?? "",
     documentDate: calculation?.documentDate ?? "",
     customerName: customer.legalName,
     customerDetails: calculation?.customerDetails ?? formatPartyDetails(customer),
-    customerRepresentative: calculation?.customerDirector ?? customer.representativeName,
-    customerLegalBasis: customer.authorizationBasis?.value ?? "",
+    customerRepresentative: hasExplicitSignatory ? signatory.fullName ?? "" : calculation?.customerDirector ?? signatory.fullName ?? customer.representativeName,
+    customerLegalBasis: hasExplicitSignatory ? signatory.authorizationBasis ?? "" : customer.authorizationBasis?.value ?? "",
     customerTaxStatus: customer.taxStatus ?? HISTORICAL_CUSTOMER_TAX_STATUS,
-    customerSignatureTitle: customer.signaturePosition,
-    customerSignature: calculation?.customerDirector ?? customer.signatureName,
+    customerSignatureTitle: signatory.position,
+    customerSignature: signatory.displayName,
     contractorName: contractor.legalName,
     contractorRegistrationDetails: `код ЄДРПОУ ${contractor.identificationCode}`,
     contractorAuthorizationBasis: contractor.authorizationBasis?.value ?? "",
@@ -206,11 +214,14 @@ export function syncContractFromCalculation(
 ): TechnicalSupervisionContractForm {
   const customer = getCustomerProfile(calculation.customerProfileId ?? contract.customerProfileId);
   const contractor = getContractorProfile(calculation.contractorProfileId ?? contract.contractorProfileId);
+  const signatoryId = calculation.customerSignatoryId ?? contract.customerSignatoryId;
+  const signatory = getCustomerSignatory(signatoryId);
   const next = {
     ...contract,
     projectName: calculation.projectName ?? contract.projectName,
     chapters1To9TotalUah: calculation.chapters1To9TotalUah ?? contract.chapters1To9TotalUah,
     customerProfileId: calculation.customerProfileId ?? contract.customerProfileId,
+    customerSignatoryId: signatoryId,
     contractorProfileId: calculation.contractorProfileId ?? contract.contractorProfileId,
     customerName: customer.legalName,
     contractorName: contractor.legalName,
@@ -221,8 +232,10 @@ export function syncContractFromCalculation(
     contractNumber: calculation.contractNumber ?? contract.contractNumber,
     documentDate: calculation.documentDate ?? contract.documentDate,
     customerDetails: calculation.customerDetails ?? contract.customerDetails,
-    customerRepresentative: calculation.customerDirector ?? contract.customerRepresentative,
-    customerSignature: calculation.customerDirector ?? contract.customerSignature,
+    customerRepresentative: signatory.fullName ?? "",
+    customerLegalBasis: signatory.authorizationBasis ?? "",
+    customerSignatureTitle: signatory.position,
+    customerSignature: signatory.displayName,
     contractorDetails: calculation.contractorDetails ?? contract.contractorDetails,
     contractorSignatureTitle: calculation.contractorSignatureTitle ?? contract.contractorSignatureTitle,
     contractorSignature: calculation.contractorSignature ?? contract.contractorSignature,

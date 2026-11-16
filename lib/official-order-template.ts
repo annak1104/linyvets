@@ -3,6 +3,7 @@ import path from "node:path";
 import Docxtemplater from "docxtemplater";
 import PizZip from "pizzip";
 
+import { defaultCustomerSignatoryId, getCustomerSignatory, type CustomerSignatoryId } from "@/lib/party-profiles";
 import {
   amountInWordsUkrainian,
   formatThousandsUah,
@@ -10,6 +11,9 @@ import {
 } from "@/lib/ua-currency-to-words";
 
 export type OfficialOrderTemplateData = {
+  customerSignatoryId?: CustomerSignatoryId;
+  customerSignatureTitle?: string;
+  customerSignature?: string;
   projectName?: string;
   estimatedAmountThousandsUah?: DecimalInput;
   estimatedAmountInWords?: string;
@@ -62,12 +66,15 @@ function engineerParagraph(data: OfficialOrderTemplateData): string {
 }
 
 export function buildOfficialOrderTemplateValues(data: OfficialOrderTemplateData): Record<string, string> {
+  const signatory = getCustomerSignatory(data.customerSignatoryId ?? defaultCustomerSignatoryId);
   const amount = data.estimatedAmountThousandsUah;
   const estimatedAmount = amount === undefined ? "" : formatThousandsUah(amount);
   const estimatedAmountInWords =
     data.estimatedAmountInWords ?? (amount === undefined ? "" : amountInWordsUkrainian(amount));
 
   return {
+    customerSignatureTitle: data.customerSignatureTitle ?? signatory.position,
+    customerSignature: data.customerSignature ?? signatory.displayName,
     orderParagraph1: data.orderParagraph1 ?? DEFAULT_ORDER_PARAGRAPH,
     orderParagraph2: data.orderParagraph2 ?? projectParagraph(data, estimatedAmount, estimatedAmountInWords),
     orderParagraph3: data.orderParagraph3 ?? organizationParagraph(data.projectOrganization),

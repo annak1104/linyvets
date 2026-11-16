@@ -66,7 +66,7 @@ function validateDocument(document: { id: ValidatedDocument["id"]; data: unknown
   | { success: true; document: ValidatedDocument }
   | { success: false; error: BatchValidationError } {
   if (document.id === "official-estimate-order") {
-    const parsed = orderSchema.safeParse(document.data);
+    const parsed = orderSchema.safeParse(normalizeProfilePayload(document.data));
     return parsed.success
       ? { success: true, document: { id: document.id, data: parsed.data } }
       : { success: false, error: validationError(document.id, parsed.error) };

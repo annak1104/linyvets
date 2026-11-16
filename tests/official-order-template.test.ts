@@ -70,6 +70,8 @@ describe("official order Docxtemplater template", () => {
       "projectOrganization",
       "chiefProjectEngineer",
       "certificate",
+      "customerSignatureTitle",
+      "customerSignature",
     ]) {
       expect(xml).toContain(`{{${slot}}}`);
     }
@@ -79,7 +81,7 @@ describe("official order Docxtemplater template", () => {
     expect(xml).not.toContain("197,271");
     expect(xml).not.toContain("Шевчук І.В.");
     expect(xml).not.toContain("012269");
-    expect(text).toContain("Василь ЛІЩУК");
+    expect(text).not.toContain("Василь ЛІЩУК");
     expect(text).toContain("Яворський Віктор");
   });
 
@@ -101,6 +103,8 @@ describe("official order Docxtemplater template", () => {
       projectOrganization: "",
       chiefProjectEngineer: "Ігор ШЕВЧУК",
       certificate: "",
+      customerSignatureTitle: "Директор",
+      customerSignature: "Ліщук В.Я.",
     });
     const xml = documentXml(generated);
     const text = documentText(generated);
@@ -113,7 +117,7 @@ describe("official order Docxtemplater template", () => {
     expect(text).toContain("Проєктна організація:");
     expect(text).toContain("Головний інженер проєкту: Ігор ШЕВЧУК");
     expect(text).toContain("ЛУЦЬКА  МІСЬКА  РАДА");
-    expect(text).toContain("Василь ЛІЩУК");
+    expect(text).toContain("Ліщук В.Я.");
     expect(xml).not.toContain("Кравчука");
     expect(xml).not.toContain("Шевчук І.В.");
     expect(xml).not.toContain("012269");

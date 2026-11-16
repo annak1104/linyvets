@@ -26,6 +26,7 @@ import { batchZipFilename } from "@/lib/batch-generation";
 import { buildOrderParagraphs, emptyOrderValues, officialOrderCertificateValue, orderSchema, type OrderForm } from "@/lib/order-form";
 import { buildTechnicalSupervisionCalculationDefaults, emptyTechnicalSupervisionCalculationValues, technicalSupervisionCalculationSchema, type TechnicalSupervisionCalculationForm } from "@/lib/technical-supervision-calculation";
 import { buildTechnicalSupervisionContractDefaults, createEmptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
+import { customerSignatories, defaultCustomerSignatoryId, getCustomerSignatory, type CustomerSignatoryId } from "@/lib/party-profiles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -56,6 +57,7 @@ export function GeneratorWorkspace() {
   const [parseResult, setParseResult] = useState<Avk5ParseResult | null>(null);
   const [estimateContext, setEstimateContext] = useState<EstimateContext | null>(null);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<DocumentId[]>(defaultSelectedDocumentIds);
+  const [customerSignatoryId, setCustomerSignatoryId] = useState<CustomerSignatoryId>(defaultCustomerSignatoryId);
   const [activeDocumentId, setActiveDocumentId] = useState<DocumentId>("official-estimate-order");
   const [generatedDocumentId, setGeneratedDocumentId] = useState<DocumentId>("official-estimate-order");
   const [batchGenerated, setBatchGenerated] = useState(false);
@@ -86,16 +88,49 @@ export function GeneratorWorkspace() {
   const watchedCalculationValues = useWatch({ control: calculationForm.control });
   const watchedContractValues = useWatch({ control: contractForm.control });
 
+  const handleCustomerSignatoryChange = (nextSignatoryId: CustomerSignatoryId) => {
+    if (nextSignatoryId === customerSignatoryId) return;
+
+    const hasManualSignatoryChanges = [
+      form.formState.dirtyFields.customerSignatureTitle,
+      form.formState.dirtyFields.customerSignature,
+      calculationForm.formState.dirtyFields.customerSignatureTitle,
+      calculationForm.formState.dirtyFields.customerDirector,
+      contractForm.formState.dirtyFields.customerRepresentative,
+      contractForm.formState.dirtyFields.customerLegalBasis,
+      contractForm.formState.dirtyFields.customerSignatureTitle,
+      contractForm.formState.dirtyFields.customerSignature,
+    ].some(Boolean);
+    if (hasManualSignatoryChanges && !window.confirm("Заміна підписанта перезапише вручну змінені поля підписанта. Продовжити?")) return;
+
+    const signatory = getCustomerSignatory(nextSignatoryId);
+    setCustomerSignatoryId(nextSignatoryId);
+
+    form.setValue("customerSignatoryId", nextSignatoryId, { shouldDirty: false, shouldValidate: true });
+    form.setValue("customerSignatureTitle", signatory.position, { shouldDirty: false, shouldValidate: true });
+    form.setValue("customerSignature", signatory.displayName, { shouldDirty: false, shouldValidate: true });
+
+    calculationForm.setValue("customerSignatoryId", nextSignatoryId, { shouldDirty: false, shouldValidate: true });
+    calculationForm.setValue("customerSignatureTitle", signatory.position, { shouldDirty: false, shouldValidate: true });
+    calculationForm.setValue("customerDirector", signatory.displayName, { shouldDirty: false, shouldValidate: true });
+
+    contractForm.setValue("customerSignatoryId", nextSignatoryId, { shouldDirty: false, shouldValidate: true });
+    contractForm.setValue("customerRepresentative", signatory.fullName ?? "", { shouldDirty: false, shouldValidate: true });
+    contractForm.setValue("customerLegalBasis", signatory.authorizationBasis ?? "", { shouldDirty: false, shouldValidate: true });
+    contractForm.setValue("customerSignatureTitle", signatory.position, { shouldDirty: false, shouldValidate: true });
+    contractForm.setValue("customerSignature", signatory.displayName, { shouldDirty: false, shouldValidate: true });
+  };
+
   useEffect(() => {
-    const synced = syncContractFromCalculation(contractForm.getValues(), watchedCalculationValues);
+    const synced = syncContractFromCalculation(contractForm.getValues(), { ...watchedCalculationValues, customerSignatoryId });
     const dirtyFields = contractForm.formState.dirtyFields;
-    const sharedFields: (keyof TechnicalSupervisionContractForm)[] = ["projectName", "chapters1To9TotalUah", "customerProfileId", "contractorProfileId", "customerName", "contractorName", "contractorRegistrationDetails", "contractorAuthorizationBasis", "contractorCertificate", "contractorTaxStatus", "contractNumber", "documentDate", "customerDetails", "customerRepresentative", "customerSignature", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "calculationRatePercent"];
+    const sharedFields: (keyof TechnicalSupervisionContractForm)[] = ["projectName", "chapters1To9TotalUah", "customerProfileId", "customerSignatoryId", "contractorProfileId", "customerName", "customerLegalBasis", "customerRepresentative", "customerSignatureTitle", "customerSignature", "contractorName", "contractorRegistrationDetails", "contractorAuthorizationBasis", "contractorCertificate", "contractorTaxStatus", "contractNumber", "documentDate", "customerDetails", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "calculationRatePercent"];
     for (const field of sharedFields) {
       if (!dirtyFields[field]) contractForm.setValue(field, synced[field], { shouldDirty: false, shouldValidate: false });
     }
     if (!dirtyFields.supervisionAmountUah) contractForm.setValue("supervisionAmountUah", synced.supervisionAmountUah, { shouldDirty: false, shouldValidate: false });
     if (!dirtyFields.supervisionAmountInWords) contractForm.setValue("supervisionAmountInWords", synced.supervisionAmountInWords, { shouldDirty: false, shouldValidate: false });
-  }, [contractForm, watchedCalculationValues]);
+  }, [contractForm, customerSignatoryId, watchedCalculationValues]);
 
   useEffect(() => {
     const dirtyFields = calculationForm.formState.dirtyFields;
@@ -107,7 +142,8 @@ export function GeneratorWorkspace() {
       ["contractNumber", "contractNumber"],
       ["documentDate", "documentDate"],
       ["customerDetails", "customerDetails"],
-      ["customerDirector", "customerRepresentative"],
+      ["customerSignatoryId", "customerSignatoryId"],
+      ["customerSignatureTitle", "customerSignatureTitle"],
       ["contractorDetails", "contractorDetails"],
       ["contractorSignatureTitle", "contractorSignatureTitle"],
       ["contractorSignature", "contractorSignature"],
@@ -170,7 +206,7 @@ export function GeneratorWorkspace() {
       const result = payload.result;
       const context = createEstimateContext(result, file.name);
       setEstimateContext(context);
-      const calculationDefaults = buildTechnicalSupervisionCalculationDefaults(context);
+      const calculationDefaults = buildTechnicalSupervisionCalculationDefaults(context, customerSignatoryId);
       calculationForm.reset(calculationDefaults);
       contractForm.reset(buildTechnicalSupervisionContractDefaults(context, calculationDefaults));
       const amountText = context.totals.final.value?.text ?? "";
@@ -180,6 +216,9 @@ export function GeneratorWorkspace() {
       };
       const nextValues: OrderForm = {
         ...emptyOrderValues,
+        customerSignatoryId,
+        customerSignatureTitle: getCustomerSignatory(customerSignatoryId).position,
+        customerSignature: getCustomerSignatory(customerSignatoryId).displayName,
         projectName: context.project.name.value ?? "",
         projectOrganization: context.people.projectOrganizationHead.value ?? "",
         chiefProjectEngineer: context.people.chiefProjectEngineer.value ?? "",
@@ -484,6 +523,7 @@ export function GeneratorWorkspace() {
     setParseResult(null);
     setEstimateContext(null);
     setSelectedDocumentIds(defaultSelectedDocumentIds);
+    setCustomerSignatoryId(defaultCustomerSignatoryId);
     setActiveDocumentId("official-estimate-order");
     setGeneratedDocumentId("official-estimate-order");
     setBatchGenerated(false);
@@ -525,6 +565,16 @@ export function GeneratorWorkspace() {
           </div>
 
           <DocumentSelector selectedDocumentIds={selectedDocumentIds} onChange={handleDocumentSelection} />
+
+          <div className="mb-5 rounded-2xl border bg-card px-4 py-4 surface-shadow sm:px-6">
+            <label className="block max-w-xl text-sm font-semibold" htmlFor="customer-signatory-selector">
+              Підписант замовника
+              <select id="customer-signatory-selector" aria-label="Підписант замовника" value={customerSignatoryId} onChange={(event) => handleCustomerSignatoryChange(event.target.value as CustomerSignatoryId)} className="mt-2 h-11 w-full rounded-xl border bg-background px-3 text-sm font-normal outline-none">
+                {customerSignatories.map((signatory) => <option key={signatory.id} value={signatory.id}>{signatory.position} — {signatory.displayName}</option>)}
+              </select>
+            </label>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Вибір синхронізується між наказом, розрахунком і договором. Відсутні повні дані для в.о. директора потрібно внести вручну.</p>
+          </div>
 
           <div className="mb-7 rounded-2xl border bg-card px-4 py-4 surface-shadow sm:mb-8 sm:px-6">
             <Stepper currentStep={step} />

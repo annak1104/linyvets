@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { POST } from "@/app/api/generate-documents/route";
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
+import { customerSignatories } from "@/lib/party-profiles";
 import { buildOrderParagraphs, emptyOrderValues } from "@/lib/order-form";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 import { buildTechnicalSupervisionCalculationDefaults } from "@/lib/technical-supervision-calculation";
@@ -142,6 +143,50 @@ describe("POST /api/generate-documents", () => {
       const xml = documentXml(new PizZip(archive).file(entry)!.asNodeBuffer()).replaceAll("&quot;", '"');
       expect(xml).toContain(projectName);
       expect(xml).not.toContain("{{");
+    }
+  });
+
+  it.each(customerSignatories)("uses the selected %s signatory in every ZIP document", async (signatory) => {
+    const documents = await buildDocuments();
+    const contract = {
+      ...documents["technical-supervision-contract"],
+      customerSignatoryId: signatory.id,
+      customerSignatureTitle: signatory.position,
+      customerSignature: signatory.displayName,
+      customerRepresentative: signatory.fullName ?? "Ручне повне ім’я підписанта",
+      customerLegalBasis: signatory.authorizationBasis ?? "Окрема підстава повноважень",
+    };
+    const requestDocuments = [
+      {
+        id: "official-estimate-order" as const,
+        data: {
+          ...documents["official-estimate-order"],
+          customerSignatoryId: signatory.id,
+          customerSignatureTitle: signatory.position,
+          customerSignature: signatory.displayName,
+        },
+      },
+      {
+        id: "technical-supervision-calculation" as const,
+        data: {
+          ...documents["technical-supervision-calculation"],
+          customerSignatoryId: signatory.id,
+          customerSignatureTitle: signatory.position,
+          customerDirector: signatory.displayName,
+        },
+      },
+      { id: "technical-supervision-contract" as const, data: contract },
+    ];
+    const response = await POST(requestFor(requestDocuments));
+    const archive = Buffer.from(await response.arrayBuffer());
+    const entries = archiveEntries(archive);
+
+    expect(response.status).toBe(200);
+    expect(entries).toHaveLength(3);
+    for (const entry of entries) {
+      const xml = documentXml(new PizZip(archive).file(entry)!.asNodeBuffer()).replaceAll("&quot;", '"');
+      expect(xml).toContain(signatory.position);
+      expect(xml).toContain(signatory.displayName);
     }
   });
 

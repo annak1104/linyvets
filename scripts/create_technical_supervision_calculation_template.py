@@ -92,6 +92,7 @@ def create_template(source: Path, destination: Path) -> None:
         replace_paragraph_text(customer_paragraphs[0], "{{customerDetails}}")
         for index in range(1, 11):
             replace_paragraph_text(customer_paragraphs[index], "")
+        replace_paragraph_text(customer_paragraphs[11], "{{customerSignatureTitle}}")
         replace_paragraph_text(customer_paragraphs[13], "______________________ {{customerDirector}}")
 
         contractor_paragraphs = cell_paragraphs(party_cells[1])

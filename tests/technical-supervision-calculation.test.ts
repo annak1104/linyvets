@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
+import { customerSignatories } from "@/lib/party-profiles";
 import {
   buildTechnicalSupervisionCalculationDefaults,
   buildTechnicalSupervisionCalculationTemplateValues,
@@ -55,8 +56,24 @@ describe("technical supervision calculation", () => {
     expect(xml).toContain("1");
     expect(xml).toContain("4");
     expect(xml).toContain("{{customerDirector}}");
+    expect(xml).toContain("{{customerSignatureTitle}}");
     expect(xml).toContain("{{contractorSignature}}");
     expect(styles).toContain("w:styles");
+  });
+
+  it("maps every approved customer signatory to the calculation preview values", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/67_КД_ЗКР.rtf")));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+
+    for (const signatory of customerSignatories) {
+      const values = buildTechnicalSupervisionCalculationDefaults(context, signatory.id);
+      const templateValues = buildTechnicalSupervisionCalculationTemplateValues(values);
+      expect(values.customerSignatoryId).toBe(signatory.id);
+      expect(values.customerSignatureTitle).toBe(signatory.position);
+      expect(values.customerDirector).toBe(signatory.displayName);
+      expect(templateValues.customerSignatureTitle).toBe(signatory.position);
+      expect(templateValues.customerDirector).toBe(signatory.displayName);
+    }
   });
 
   it("recomputes derived values when the editable rate changes", async () => {

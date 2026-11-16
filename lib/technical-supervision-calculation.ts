@@ -5,11 +5,14 @@ import type { EstimateContext } from "@/lib/documents/types";
 import {
   contractorProfileIdSchema,
   customerProfileIdSchema,
+  customerSignatoryIdSchema,
+  defaultCustomerSignatoryId,
   defaultContractorProfileId,
   defaultCustomerProfileId,
   formatPartyDetails,
   getContractorProfile,
   getCustomerProfile,
+  getCustomerSignatory,
 } from "@/lib/party-profiles";
 
 const KOPECKS_PER_THOUSAND_UAH = BigInt(100_000);
@@ -30,6 +33,7 @@ const optionalText = z.string().trim();
 export const technicalSupervisionCalculationSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
   customerProfileId: customerProfileIdSchema,
+  customerSignatoryId: customerSignatoryIdSchema,
   contractorProfileId: contractorProfileIdSchema,
   consolidatedTotalUah: decimalText,
   chapters1To9TotalUah: decimalText,
@@ -39,6 +43,7 @@ export const technicalSupervisionCalculationSchema = z.object({
   contractNumber: optionalText,
   documentDate: optionalText,
   customerDetails: requiredText,
+  customerSignatureTitle: requiredText,
   customerDirector: requiredText,
   contractorDetails: requiredText,
   contractorSignatureTitle: requiredText,
@@ -50,6 +55,7 @@ export type TechnicalSupervisionCalculationForm = z.infer<typeof technicalSuperv
 export const emptyTechnicalSupervisionCalculationValues: TechnicalSupervisionCalculationForm = {
   projectName: "",
   customerProfileId: defaultCustomerProfileId,
+  customerSignatoryId: defaultCustomerSignatoryId,
   contractorProfileId: defaultContractorProfileId,
   consolidatedTotalUah: "",
   chapters1To9TotalUah: "",
@@ -59,6 +65,7 @@ export const emptyTechnicalSupervisionCalculationValues: TechnicalSupervisionCal
   contractNumber: "",
   documentDate: "",
   customerDetails: "",
+  customerSignatureTitle: getCustomerSignatory(defaultCustomerSignatoryId).position,
   customerDirector: "",
   contractorDetails: "",
   contractorSignatureTitle: "",
@@ -152,6 +159,7 @@ export function buildTechnicalSupervisionCalculationTemplateValues(data: Technic
     contractNumber: data.contractNumber || "__________",
     documentDate: data.documentDate ? `«${data.documentDate}» року` : "«____» __________ 2026 року",
     customerDetails: data.customerDetails,
+    customerSignatureTitle: data.customerSignatureTitle,
     customerDirector: data.customerDirector,
     contractorDetails: data.contractorDetails,
     contractorSignatureTitle: data.contractorSignatureTitle,
@@ -163,16 +171,19 @@ function contextMoneyToUah(contextValue: EstimateContext["totals"]["consolidated
   return contextValue.value?.text ? formatUahFromThousands(contextValue.value.text) : "";
 }
 
-export function buildTechnicalSupervisionCalculationDefaults(context: EstimateContext): TechnicalSupervisionCalculationForm {
+export function buildTechnicalSupervisionCalculationDefaults(context: EstimateContext, customerSignatoryId: TechnicalSupervisionCalculationForm["customerSignatoryId"] = defaultCustomerSignatoryId): TechnicalSupervisionCalculationForm {
   const customer = getCustomerProfile();
   const contractor = getContractorProfile(defaultContractorProfileId);
+  const signatory = getCustomerSignatory(customerSignatoryId);
   const defaults: TechnicalSupervisionCalculationForm = {
     ...emptyTechnicalSupervisionCalculationValues,
+    customerSignatoryId,
     projectName: context.project.name.value ?? "",
     consolidatedTotalUah: contextMoneyToUah(context.totals.consolidated),
     chapters1To9TotalUah: context.totals.chapters1To9.value?.text ? formatUahFromThousands(context.totals.chapters1To9.value.text) : "",
     customerDetails: formatPartyDetails(customer),
-    customerDirector: customer.signatureName,
+    customerSignatureTitle: signatory.position,
+    customerDirector: signatory.displayName,
     contractorDetails: formatPartyDetails(contractor),
     contractorSignatureTitle: contractor.signaturePosition,
     contractorSignature: contractor.signatureName,

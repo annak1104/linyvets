@@ -163,7 +163,7 @@ test.describe("Лінивець complete workflow", () => {
     await page.getByLabel(/Номер договору/).fill("01/26");
     await page.getByLabel(/Дата документа/).fill("12 травня 2026");
     await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса");
-    await page.getByLabel(/Директор замовника/).fill("Директор");
+    await page.getByLabel(/ПІБ підписанта замовника/).fill("Директор");
     await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса");
     await page.getByLabel(/Посада виконавця/).fill("ФОП");
     await page.getByLabel(/Підпис виконавця/).fill("Підписант");
@@ -252,7 +252,7 @@ test.describe("Лінивець complete workflow", () => {
     await page.getByLabel(/Номер договору/).fill("01/26");
     await page.getByLabel(/Дата документа/).fill("12 травня 2026");
     await page.getByLabel(/Реквізити замовника/).fill("Замовник\nАдреса");
-    await page.getByLabel(/Директор замовника/).fill("Директор");
+    await page.getByLabel(/ПІБ підписанта замовника/).fill("Директор");
     await page.getByLabel(/Реквізити виконавця/).fill("Виконавець\nАдреса");
     await page.getByLabel(/Посада виконавця/).fill("ФОП");
     await page.getByLabel(/Підпис виконавця/).fill("Підписант");

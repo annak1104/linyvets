@@ -75,6 +75,48 @@ export const customerProfile: PartyProfile & { id: CustomerProfileId } = {
   missingFields: ["iban", "email", "taxStatus", "certificate"],
 };
 
+export const customerSignatoryIdSchema = z.enum(["director-lishchuk", "acting-havryliuk", "acting-hrelia"]);
+export type CustomerSignatoryId = z.infer<typeof customerSignatoryIdSchema>;
+export type CustomerSignatory = {
+  id: CustomerSignatoryId;
+  position: string;
+  displayName: string;
+  fullName: string | null;
+  authorizationBasis: string | null;
+};
+
+export const customerSignatories: readonly CustomerSignatory[] = [
+  {
+    id: "director-lishchuk",
+    position: "Директор",
+    displayName: "Ліщук В.Я.",
+    fullName: "Ліщук Василь Ярославович",
+    authorizationBasis: customerProfile.authorizationBasis?.value ?? null,
+  },
+  {
+    id: "acting-havryliuk",
+    position: "В.о. директора",
+    displayName: "Гаврилюк С.В.",
+    fullName: null,
+    authorizationBasis: null,
+  },
+  {
+    id: "acting-hrelia",
+    position: "В.о. директора",
+    displayName: "Греля А.Ю.",
+    fullName: null,
+    authorizationBasis: null,
+  },
+] as const;
+
+export const defaultCustomerSignatoryId: CustomerSignatoryId = "director-lishchuk";
+
+export function getCustomerSignatory(id: CustomerSignatoryId = defaultCustomerSignatoryId): CustomerSignatory {
+  const signatory = customerSignatories.find((item) => item.id === id);
+  if (!signatory) throw new Error(`Unknown customer signatory: ${id}`);
+  return signatory;
+}
+
 export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfileId })[] = [
   {
     id: "probudkontrol",
@@ -243,9 +285,16 @@ export function formatPartyDetails(profile: PartyProfile): string {
 export function normalizeProfilePayload(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
   const value = payload as Record<string, unknown>;
+  const signatoryId = customerSignatoryIdSchema.safeParse(value.customerSignatoryId).success
+    ? value.customerSignatoryId as CustomerSignatoryId
+    : defaultCustomerSignatoryId;
+  const signatory = getCustomerSignatory(signatoryId);
   return {
     ...value,
     customerProfileId: value.customerProfileId ?? defaultCustomerProfileId,
     contractorProfileId: value.contractorProfileId ?? defaultContractorProfileId,
+    customerSignatoryId: signatoryId,
+    customerSignatureTitle: value.customerSignatureTitle ?? signatory.position,
+    customerSignature: value.customerSignature ?? signatory.displayName,
   };
 }
