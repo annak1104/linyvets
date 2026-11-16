@@ -15,6 +15,11 @@ describe("configured party profiles", () => {
     expect(customerProfile.iban).toBeNull();
     expect(customerProfile.sourceIbanText).toBe("UA_______________________");
     expect(customerProfile.signatureName).toBe("В.Я.Ліщук");
+    expect(customerProfile.authorizationBasis).toEqual({
+      value: "Положення про департамент, затверджене рішенням Луцької міської ради від 29.06.2017 № 26/12",
+      sourceReference: "Договір ПР Мостозагін.doc",
+      verificationStatus: "historical-reference",
+    });
     expect(formatPartyDetails(customerProfile)).toContain("р/р №");
   });
 
@@ -45,5 +50,7 @@ describe("configured party profiles", () => {
     });
     expect(getContractorProfile("fop-shevchuk").certificate).toBeNull();
     expect(getContractorProfile("fop-shevchuk").taxStatus).toBeNull();
+    expect(getContractorProfile("ik-zahid").authorizationBasis).toBeNull();
+    expect(getContractorProfile("fop-shevchuk").authorizationBasis).toBeNull();
   });
 });

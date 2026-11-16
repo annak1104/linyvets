@@ -6,6 +6,11 @@ export const contractorProfileIdSchema = z.enum(["probudkontrol", "ik-zahid", "f
 export type CustomerProfileId = z.infer<typeof customerProfileIdSchema>;
 export type ContractorProfileId = z.infer<typeof contractorProfileIdSchema>;
 export type ProfileVerificationStatus = "unverified";
+export type HistoricalReference = {
+  value: string;
+  sourceReference: string;
+  verificationStatus: "historical-reference";
+};
 
 export type PartyProfile = {
   id: CustomerProfileId | ContractorProfileId;
@@ -25,6 +30,7 @@ export type PartyProfile = {
   signaturePosition: string;
   certificate: string | null;
   taxStatus: string | null;
+  authorizationBasis: HistoricalReference | null;
   verificationStatus: ProfileVerificationStatus;
   sourceReference: string;
   missingFields: readonly string[];
@@ -48,6 +54,11 @@ export const customerProfile: PartyProfile & { id: CustomerProfileId } = {
   signaturePosition: "Директор",
   certificate: null,
   taxStatus: null,
+  authorizationBasis: {
+    value: "Положення про департамент, затверджене рішенням Луцької міської ради від 29.06.2017 № 26/12",
+    sourceReference: "Договір ПР Мостозагін.doc",
+    verificationStatus: "historical-reference",
+  },
   verificationStatus: "unverified",
   sourceReference: "Розрахунок Ветеранів.doc; Розрахунок.doc; Розрахунок технічного нагляду ПР Мостозагін.doc",
   missingFields: ["iban", "email", "taxStatus", "certificate"],
@@ -72,6 +83,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     signaturePosition: "Директор",
     certificate: null,
     taxStatus: null,
+    authorizationBasis: null,
     verificationStatus: "unverified",
     sourceReference: "Розрахунок Ветеранів.doc",
     missingFields: ["certificate", "taxStatus"],
@@ -94,6 +106,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     signaturePosition: "Директор",
     certificate: null,
     taxStatus: null,
+    authorizationBasis: null,
     verificationStatus: "unverified",
     sourceReference: "Розрахунок.doc",
     missingFields: ["certificate", "taxStatus"],
@@ -116,6 +129,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     signaturePosition: "ФОП",
     certificate: null,
     taxStatus: null,
+    authorizationBasis: null,
     verificationStatus: "unverified",
     sourceReference: "Розрахунок технічного нагляду ПР Мостозагін.doc",
     missingFields: ["email", "certificate", "taxStatus"],
@@ -137,7 +151,11 @@ export function getContractorProfile(id: ContractorProfileId): PartyProfile & { 
 }
 
 export function formatPartyDetails(profile: PartyProfile): string {
-  const accountLine = profile.iban ? `${profile.accountPrefix}${profile.iban}` : profile.accountPrefix;
+  const accountLine = profile.iban
+    ? `${profile.accountPrefix}${profile.iban}`
+    : profile.sourceIbanText
+      ? `${profile.accountPrefix}${profile.sourceIbanText}`
+      : profile.accountPrefix;
   return [
     profile.legalName,
     profile.address,

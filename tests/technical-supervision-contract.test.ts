@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
-import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, emptyTechnicalSupervisionContractValues } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, emptyTechnicalSupervisionContractValues, suggestedContractEndDate } from "@/lib/technical-supervision-contract";
 import { loadTechnicalSupervisionContractTemplate } from "@/lib/technical-supervision-contract-template";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
 
@@ -24,6 +24,14 @@ describe("technical supervision contract", () => {
     expect(defaults.contractorDetails).toContain("ФОП Шевчук Ігор Вікторович");
     expect(defaults.contractorDetails).toContain("UA113033980000026009500700621");
     expect(defaults.contractorCertificate).toBe("");
+    expect(defaults.customerLegalBasis).toBe("Положення про департамент, затверджене рішенням Луцької міської ради від 29.06.2017 № 26/12");
+    expect(defaults.contractEndDate).toBe("31.12.2026");
+    expect(defaults.appendixReference).toBe("Розрахунок кошторисної вартості технічного нагляду");
+  });
+
+  it("offers the historical end date only for a 2026 contract context", () => {
+    expect(suggestedContractEndDate(new Date("2026-01-01T00:00:00.000Z"))).toBe("31.12.2026");
+    expect(suggestedContractEndDate(new Date("2027-01-01T00:00:00.000Z"))).toBe("");
   });
 
   it("recomputes the amount and keeps repeated fields synchronized", () => {

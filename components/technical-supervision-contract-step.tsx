@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, FileCheck2, FileSpreadsheet, Info, LoaderCircle,
 import type { EstimateContext } from "@/lib/documents/types";
 import { contractorProfiles, formatPartyDetails, getContractorProfile, getCustomerProfile } from "@/lib/party-profiles";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
-import { buildTechnicalSupervisionContractTemplateValues, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractTemplateValues, CONTRACT_APPENDIX_REFERENCE, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 import { calculateSupervisionAmountKopecks, formatUahKopecks, supervisionAmountInWords } from "@/lib/technical-supervision-calculation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,43 +82,43 @@ export function TechnicalSupervisionContractStep({ form, estimateContext, isGene
             <section aria-labelledby="contract-source-heading">
               <SectionHeading id="contract-source-heading" title="Дані кошторису" description="Ці поля походять з одного EstimateContext і використовуються також у Phase 2." />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Назва об’єкта" hint={sourceHint(estimateContext?.project.name.value)} error={form.formState.errors.projectName?.message}><Input {...form.register("projectName")} /></Field>
-                <Field label="База: глави 1–9, грн" hint={sourceHint(estimateContext?.totals.chapters1To9.value)} error={form.formState.errors.chapters1To9TotalUah?.message}><Input {...form.register("chapters1To9TotalUah")} inputMode="decimal" /></Field>
-                <Field label="Ставка розрахунку, %" hint="Редагується" error={form.formState.errors.calculationRatePercent?.message}><Input {...form.register("calculationRatePercent")} inputMode="decimal" /></Field>
-                <Field label="Сума договору, грн" hint="Автоматично"><Input {...form.register("supervisionAmountUah")} readOnly className="bg-background" /></Field>
-                <Field label="Сума українською" hint="Автоматично"><Textarea {...form.register("supervisionAmountInWords")} readOnly className="min-h-24 bg-background" /></Field>
+                <Field label="Назва об’єкта" hint={sourceHint(estimateContext?.project.name.value, Boolean(form.formState.dirtyFields.projectName))} error={form.formState.errors.projectName?.message}><Input {...form.register("projectName")} /></Field>
+                <Field label="База: глави 1–9, грн" hint={sourceHint(estimateContext?.totals.chapters1To9.value, Boolean(form.formState.dirtyFields.chapters1To9TotalUah))} error={form.formState.errors.chapters1To9TotalUah?.message}><Input {...form.register("chapters1To9TotalUah")} inputMode="decimal" /></Field>
+                <Field label="Ставка розрахунку, %" hint={historicalHint(values.calculationRatePercent, Boolean(form.formState.dirtyFields.calculationRatePercent))} error={form.formState.errors.calculationRatePercent?.message}><Input {...form.register("calculationRatePercent")} inputMode="decimal" /></Field>
+                <Field label="Сума договору, грн" hint="Розраховано автоматично"><Input {...form.register("supervisionAmountUah")} readOnly className="bg-background" /></Field>
+                <Field label="Сума українською" hint="Розраховано автоматично"><Textarea {...form.register("supervisionAmountInWords")} readOnly className="min-h-24 bg-background" /></Field>
               </div>
             </section>
 
             <section aria-labelledby="contract-details-heading">
-              <SectionHeading id="contract-details-heading" title="Реквізити договору" description="Дати, номер і додаток залишаються редагованими." />
+              <SectionHeading id="contract-details-heading" title="Реквізити договору" description="Номер і дата вводяться вручну. Кінцева дата та додаток запропоновані з історичного шаблону й залишаються редагованими." />
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Номер договору" hint={manualHint(values.contractNumber)} error={form.formState.errors.contractNumber?.message}><Input {...form.register("contractNumber")} /></Field>
                 <Field label="Дата договору" hint={manualHint(values.documentDate)} error={form.formState.errors.documentDate?.message}><Input {...form.register("documentDate")} placeholder="____ __________ 2026" /></Field>
-                <Field label="Діє до" hint={manualHint(values.contractEndDate)} error={form.formState.errors.contractEndDate?.message}><Input {...form.register("contractEndDate")} placeholder="31.12.2026" /></Field>
-                <Field label="Посилання на додаток" hint={manualHint(values.appendixReference)} error={form.formState.errors.appendixReference?.message}><Input {...form.register("appendixReference")} /></Field>
+                <Field label="Діє до" hint={historicalHint(values.contractEndDate, Boolean(form.formState.dirtyFields.contractEndDate))} error={form.formState.errors.contractEndDate?.message}><Input {...form.register("contractEndDate")} placeholder="31.12.2026" /></Field>
+                <Field label="Посилання на додаток" hint={autoHint(values.appendixReference, Boolean(form.formState.dirtyFields.appendixReference))} error={form.formState.errors.appendixReference?.message}><Input {...form.register("appendixReference")} /></Field>
               </div>
             </section>
 
             <section aria-labelledby="contract-parties-heading">
               <SectionHeading id="contract-parties-heading" title="Сторони та реквізити" description="Профілі заповнюють відомі реквізити, але історичні дані потрібно перевірити та за потреби відредагувати." />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Профіль замовника" hint="Перевірте актуальність реквізитів"><select {...form.register("customerProfileId")} disabled className="h-11 w-full min-w-0 rounded-xl border bg-background px-3 text-sm font-normal outline-none disabled:cursor-not-allowed disabled:opacity-80" aria-label="Профіль замовника"><option value={getCustomerProfile().id}>{getCustomerProfile().displayName}</option></select></Field>
-                <Field label="Назва замовника" hint={manualHint(values.customerName)} error={form.formState.errors.customerName?.message}><Input {...form.register("customerName")} /></Field>
-                <Field label="Уповноважений представник замовника" hint={manualHint(values.customerRepresentative)} error={form.formState.errors.customerRepresentative?.message}><Input {...form.register("customerRepresentative")} /></Field>
-                <Field label="Підстава повноважень замовника" hint={manualHint(values.customerLegalBasis)} error={form.formState.errors.customerLegalBasis?.message}><Input {...form.register("customerLegalBasis")} /></Field>
-                <Field label="Профіль виконавця" hint="Перевірте актуальність реквізитів"><select value={values.contractorProfileId} onChange={(event) => handleContractorProfileChange(event.target.value as TechnicalSupervisionContractForm["contractorProfileId"])} className="h-11 w-full min-w-0 rounded-xl border bg-background px-3 text-sm font-normal outline-none" aria-label="Профіль виконавця">{contractorProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName}</option>)}</select><p className="break-words text-xs font-normal leading-5 text-muted-foreground">{getContractorProfile(values.contractorProfileId).legalName}</p></Field>
-                <Field label="Назва виконавця" hint={manualHint(values.contractorName)} error={form.formState.errors.contractorName?.message}><Input {...form.register("contractorName")} /></Field>
-                <Field label="Реєстраційні дані виконавця" hint={manualHint(values.contractorRegistrationDetails)} error={form.formState.errors.contractorRegistrationDetails?.message}><Textarea {...form.register("contractorRegistrationDetails")} className="min-h-24" /></Field>
+                <Field label="Профіль замовника" hint="Автозаповнено з профілю"><select {...form.register("customerProfileId")} disabled className="h-11 w-full min-w-0 rounded-xl border bg-background px-3 text-sm font-normal outline-none disabled:cursor-not-allowed disabled:opacity-80" aria-label="Профіль замовника"><option value={getCustomerProfile().id}>{getCustomerProfile().displayName}</option></select></Field>
+                <Field label="Назва замовника" hint={profileHint(values.customerName, Boolean(form.formState.dirtyFields.customerName))} error={form.formState.errors.customerName?.message}><Input {...form.register("customerName")} /></Field>
+                <Field label="Уповноважений представник замовника" hint={profileHint(values.customerRepresentative, Boolean(form.formState.dirtyFields.customerRepresentative))} error={form.formState.errors.customerRepresentative?.message}><Input {...form.register("customerRepresentative")} /></Field>
+                <Field label="Підстава повноважень замовника" hint={historicalHint(values.customerLegalBasis, Boolean(form.formState.dirtyFields.customerLegalBasis))} error={form.formState.errors.customerLegalBasis?.message}><Input {...form.register("customerLegalBasis")} /></Field>
+                <Field label="Профіль виконавця" hint="Автозаповнено з профілю"><select value={values.contractorProfileId} onChange={(event) => handleContractorProfileChange(event.target.value as TechnicalSupervisionContractForm["contractorProfileId"])} className="h-11 w-full min-w-0 rounded-xl border bg-background px-3 text-sm font-normal outline-none" aria-label="Профіль виконавця">{contractorProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName}</option>)}</select><p className="break-words text-xs font-normal leading-5 text-muted-foreground">{getContractorProfile(values.contractorProfileId).legalName}</p></Field>
+                <Field label="Назва виконавця" hint={profileHint(values.contractorName, Boolean(form.formState.dirtyFields.contractorName))} error={form.formState.errors.contractorName?.message}><Input {...form.register("contractorName")} /></Field>
+                <Field label="Реєстраційні дані виконавця" hint={profileHint(values.contractorRegistrationDetails, Boolean(form.formState.dirtyFields.contractorRegistrationDetails))} error={form.formState.errors.contractorRegistrationDetails?.message}><Textarea {...form.register("contractorRegistrationDetails")} className="min-h-24" /></Field>
                 <Field label="Кваліфікаційний сертифікат" hint={manualHint(values.contractorCertificate)} error={form.formState.errors.contractorCertificate?.message}><Input {...form.register("contractorCertificate")} /></Field>
                 <Field label="Податковий статус замовника" hint={manualHint(values.customerTaxStatus)} error={form.formState.errors.customerTaxStatus?.message}><Input {...form.register("customerTaxStatus")} placeholder="Потребує підтвердження" /></Field>
                 <Field label="Податковий статус виконавця" hint={manualHint(values.contractorTaxStatus)} error={form.formState.errors.contractorTaxStatus?.message}><Input {...form.register("contractorTaxStatus")} placeholder="Потребує підтвердження" /></Field>
-                <Field label="Реквізити замовника" hint={manualHint(values.customerDetails)} error={form.formState.errors.customerDetails?.message}><Textarea {...form.register("customerDetails")} className="min-h-32 break-words" placeholder="Адреса, рахунок, код, банк, контакти" /></Field>
-                <Field label="Підпис замовника" hint={manualHint(values.customerSignature)} error={form.formState.errors.customerSignature?.message}><Input {...form.register("customerSignature")} /></Field>
-                <Field label="Посада замовника" hint={manualHint(values.customerSignatureTitle)} error={form.formState.errors.customerSignatureTitle?.message}><Input {...form.register("customerSignatureTitle")} /></Field>
-                <Field label="Реквізити виконавця" hint={manualHint(values.contractorDetails)} error={form.formState.errors.contractorDetails?.message}><Textarea {...form.register("contractorDetails")} className="min-h-32 break-words" placeholder="Адреса, рахунок, код, банк, контакти" /></Field>
-                <Field label="Посада виконавця" hint={manualHint(values.contractorSignatureTitle)} error={form.formState.errors.contractorSignatureTitle?.message}><Input {...form.register("contractorSignatureTitle")} /></Field>
-                <Field label="Підпис виконавця" hint={manualHint(values.contractorSignature)} error={form.formState.errors.contractorSignature?.message}><Input {...form.register("contractorSignature")} /></Field>
+                <Field label="Реквізити замовника" hint={profileHint(values.customerDetails, Boolean(form.formState.dirtyFields.customerDetails))} error={form.formState.errors.customerDetails?.message}><Textarea {...form.register("customerDetails")} className="min-h-32 break-words" placeholder="Адреса, рахунок, код, банк, контакти" /></Field>
+                <Field label="Підпис замовника" hint={profileHint(values.customerSignature, Boolean(form.formState.dirtyFields.customerSignature))} error={form.formState.errors.customerSignature?.message}><Input {...form.register("customerSignature")} /></Field>
+                <Field label="Посада замовника" hint={profileHint(values.customerSignatureTitle, Boolean(form.formState.dirtyFields.customerSignatureTitle))} error={form.formState.errors.customerSignatureTitle?.message}><Input {...form.register("customerSignatureTitle")} /></Field>
+                <Field label="Реквізити виконавця" hint={profileHint(values.contractorDetails, Boolean(form.formState.dirtyFields.contractorDetails))} error={form.formState.errors.contractorDetails?.message}><Textarea {...form.register("contractorDetails")} className="min-h-32 break-words" placeholder="Адреса, рахунок, код, банк, контакти" /></Field>
+                <Field label="Посада виконавця" hint={profileHint(values.contractorSignatureTitle, Boolean(form.formState.dirtyFields.contractorSignatureTitle))} error={form.formState.errors.contractorSignatureTitle?.message}><Input {...form.register("contractorSignatureTitle")} /></Field>
+                <Field label="Підпис виконавця" hint={profileHint(values.contractorSignature, Boolean(form.formState.dirtyFields.contractorSignature))} error={form.formState.errors.contractorSignature?.message}><Input {...form.register("contractorSignature")} /></Field>
               </div>
             </section>
 
@@ -150,7 +150,7 @@ function previewValue(values: Record<string, string> | null, key: string, fallba
 
 function resolvePreviewText(text: string, values: Record<string, string> | null): string {
   const resolved = text.replace(/\{\{(\w+)\}\}/g, (_, key: string) => previewValue(values, key, "________________"));
-  return resolved.replace("Додаток: розрахунок кошторисної вартості технічного нагляду.", `Додаток: ${previewValue(values, "appendixReference", "розрахунок кошторисної вартості технічного нагляду")}.`);
+  return resolved.replace("Додаток: розрахунок кошторисної вартості технічного нагляду.", `Додаток: ${previewValue(values, "appendixReference", CONTRACT_APPENDIX_REFERENCE)}.`);
 }
 
 function SectionHeading({ id, title, description }: { id: string; title: string; description: string }) {
@@ -161,18 +161,34 @@ function Field({ label, hint, error, children }: { label: string; hint?: string;
   return <label className="block min-w-0 space-y-2 text-sm font-semibold"><span className="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1 leading-5"><span className="min-w-0 break-words">{label}</span>{hint && <span className={hintClass(hint)}>{hint}</span>}</span>{children}{error && <span className="block text-xs font-normal text-primary-hover">{error}</span>}</label>;
 }
 
-function sourceHint(value: unknown): string {
-  return value === null || value === undefined || value === "" ? "Не знайдено у джерелі" : "Знайдено у джерелі";
+function sourceHint(value: unknown, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value === null || value === undefined || value === "" ? "Потрібно ввести вручну" : "Автозаповнено з кошторису";
 }
 
 function manualHint(value: string): string {
-  return value.trim() ? "Підтверджено вручну" : "Потрібно підтвердити";
+  return value.trim() ? "Змінено вручну" : "Потрібно ввести вручну";
+}
+
+function profileHint(value: string, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value.trim() ? "Автозаповнено з профілю" : "Потрібно ввести вручну";
+}
+
+function historicalHint(value: string, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value.trim() ? "Історичне посилання — перевірте" : "Потрібно ввести вручну";
+}
+
+function autoHint(value: string, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value.trim() ? "Автозаповнено" : "Потрібно ввести вручну";
 }
 
 function hintClass(hint: string): string {
   const layout = "inline-flex max-w-full shrink-0 whitespace-normal break-words rounded-full px-2 py-0.5 text-[10px] leading-4";
-  if (/не знайдено|потрібно підтвердити/i.test(hint)) return `${layout} bg-danger-soft font-semibold text-danger`;
-  if (/змінено|підтверджено/i.test(hint)) return `${layout} bg-cream font-semibold text-primary-hover`;
+  if (/не знайдено|потрібно ввести/i.test(hint)) return `${layout} bg-danger-soft font-semibold text-danger`;
+  if (/змінено|історичне/i.test(hint)) return `${layout} bg-cream font-semibold text-primary-hover`;
   return `${layout} bg-accent font-medium text-primary-hover`;
 }
 

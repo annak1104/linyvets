@@ -17,6 +17,31 @@ function documentXml(buffer: Buffer): string {
 }
 
 describe("POST /api/generate-technical-supervision-contract", () => {
+  it("renders the same profile and historical defaults used by the contract preview", async () => {
+    const context = createEstimateContext(await parseAvk5Estimate(source), "67_КД_ЗКР.rtf");
+    const defaults = buildTechnicalSupervisionContractDefaults(context);
+    const values = {
+      ...defaults,
+      contractNumber: "01/26",
+      documentDate: "12 травня 2026",
+      contractorCertificate: "АТ № 007622",
+      customerTaxStatus: "потребує підтвердження",
+      contractorTaxStatus: "потребує підтвердження",
+    };
+    const response = await POST(new Request("http://localhost/api/generate-technical-supervision-contract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }));
+    const xml = documentXml(Buffer.from(await response.arrayBuffer()));
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain(defaults.customerName);
+    expect(xml).toContain(defaults.customerDetails.split("\n")[0]);
+    expect(xml).toContain(defaults.contractorDetails.split("\n")[0]);
+    expect(xml).toContain(defaults.customerLegalBasis);
+    expect(xml).toContain(defaults.contractEndDate);
+    expect(xml).toContain(defaults.appendixReference);
+    expect(xml).toContain("1,1%");
+    expect(xml).toContain("1 948,49");
+  });
+
   it("generates a synchronized contract with user-confirmed party data", async () => {
     const context = createEstimateContext(await parseAvk5Estimate(source), "67_КД_ЗКР.rtf");
     const values = {

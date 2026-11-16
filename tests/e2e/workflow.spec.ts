@@ -199,7 +199,7 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel(/Сума договору, грн/)).toHaveValue("1 948,49");
     await expect(page.getByText(/історичне посилання/)).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /актуальність реквізитів/i })).toHaveCount(0);
-    await expect(page.getByText("Перевірте актуальність реквізитів").first()).toBeVisible();
+    await expect(page.getByText("Автозаповнено з профілю").first()).toBeVisible();
     await expect(page.locator('[aria-label="Попередній перегляд договору"]')).toContainText("1. Визначення окремих термінів договору.");
     await expect(page.locator('[aria-label="Попередній перегляд договору"]')).toContainText("12. Юридичні адреси, банківські реквізити і підписи Сторін.");
 

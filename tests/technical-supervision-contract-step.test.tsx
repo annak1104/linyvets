@@ -54,7 +54,28 @@ describe("TechnicalSupervisionContractStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "Сформувати договір" }));
     await waitFor(() => expect(screen.getAllByText("Підтвердіть це поле").length).toBeGreaterThan(0));
     expect(screen.queryByRole("checkbox", { name: /актуальність реквізитів/i })).toBeNull();
-    expect(screen.getAllByText(/Перевірте актуальність реквізитів/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Автозаповнено з профілю/).length).toBeGreaterThan(0);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("warns before replacing edited contractor data and keeps profile-specific details isolated", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Harness />);
+
+    const selector = screen.getByLabelText("Профіль виконавця");
+    fireEvent.change(screen.getByLabelText(/Реквізити виконавця/), { target: { value: "Власні реквізити" } });
+    fireEvent.change(selector, { target: { value: "ik-zahid" } });
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect((screen.getByLabelText("Профіль виконавця") as HTMLSelectElement).value).toBe("fop-shevchuk");
+    expect((screen.getByLabelText(/Реквізити виконавця/) as HTMLTextAreaElement).value).toBe("Власні реквізити");
+
+    confirm.mockReturnValue(true);
+    fireEvent.change(selector, { target: { value: "ik-zahid" } });
+    expect((screen.getByLabelText("Профіль виконавця") as HTMLSelectElement).value).toBe("ik-zahid");
+    expect((screen.getByLabelText(/Реквізити виконавця/) as HTMLTextAreaElement).value).toContain("ІК ЗАХІД");
+    expect((screen.getByLabelText(/Реєстраційні дані виконавця/) as HTMLTextAreaElement).value).toBe("код ЄДРПОУ 45709671");
+    expect((screen.getByLabelText(/Податковий статус виконавця/) as HTMLInputElement).value).toBe("");
+    confirm.mockRestore();
   });
 });

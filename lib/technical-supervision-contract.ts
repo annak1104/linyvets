@@ -29,6 +29,13 @@ const decimalText = z.string().trim().min(1, "Вкажіть значення").
 }, "Введіть коректну невід’ємну ставку");
 
 const requiredText = z.string().trim().min(1, "Підтвердіть це поле");
+export const HISTORICAL_CONTRACT_END_DATE_2026 = "31.12.2026";
+export const CONTRACT_APPENDIX_REFERENCE = "Розрахунок кошторисної вартості технічного нагляду";
+
+export function suggestedContractEndDate(now = new Date()): string {
+  return now.getFullYear() === 2026 ? HISTORICAL_CONTRACT_END_DATE_2026 : "";
+}
+
 export const technicalSupervisionContractSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
   customerProfileId: customerProfileIdSchema,
@@ -78,7 +85,7 @@ export const emptyTechnicalSupervisionContractValues: TechnicalSupervisionContra
   supervisionAmountInWords: "",
   customerTaxStatus: "",
   contractorTaxStatus: "",
-  appendixReference: "розрахунок кошторисної вартості технічного нагляду",
+  appendixReference: CONTRACT_APPENDIX_REFERENCE,
   customerDetails: "",
   customerSignatureTitle: "Директор",
   customerSignature: "",
@@ -110,9 +117,12 @@ export function buildTechnicalSupervisionContractDefaults(
     contractorProfileId: calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId,
     contractNumber: calculation?.contractNumber ?? "",
     documentDate: calculation?.documentDate ?? "",
+    contractEndDate: suggestedContractEndDate(),
     customerName: customer.legalName,
     customerDetails: calculation?.customerDetails ?? formatPartyDetails(customer),
     customerRepresentative: calculation?.customerDirector ?? customer.representativeName,
+    customerLegalBasis: customer.authorizationBasis?.value ?? "",
+    customerSignatureTitle: customer.signaturePosition,
     customerSignature: calculation?.customerDirector ?? customer.signatureName,
     contractorName: contractor.legalName,
     contractorRegistrationDetails: `код ЄДРПОУ ${contractor.identificationCode}`,
