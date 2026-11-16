@@ -5,7 +5,7 @@ import PizZip from "pizzip";
 import { describe, expect, it } from "vitest";
 
 import { POST } from "@/app/api/generate-order/route";
-import { buildOrderParagraphs, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, officialOrderCertificateValue, type OrderForm } from "@/lib/order-form";
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
 
@@ -37,6 +37,28 @@ function packagePart(buffer: Buffer, name: string): Buffer {
 }
 
 describe("POST /api/generate-order", () => {
+  it("generates the approved profile certificate after an explicit chief-engineer match", async () => {
+    const sourceName = "Ігор ШЕВЧУК";
+    const certificate = officialOrderCertificateValue(sourceName, sourceName);
+    const values = {
+      ...editedOrder,
+      projectOrganization: sourceName,
+      chiefProjectEngineer: sourceName,
+      certificate,
+      ...buildOrderParagraphs({ ...editedOrder, projectOrganization: sourceName, chiefProjectEngineer: sourceName, certificate }, { projectOrganizationHead: sourceName, chiefProjectEngineer: sourceName }),
+    } satisfies OrderForm;
+    const response = await POST(new Request("http://localhost/api/generate-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(values),
+    }));
+    const xml = packagePart(Buffer.from(await response.arrayBuffer()), "word/document.xml").toString("utf8");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("ФОП Шевчук І.В.");
+    expect(xml).toContain("Шевчук І.В. (сертифікат АТ № 007622)");
+  });
+
   it("uses the real local-estimate values when generating the official DOCX", async () => {
     const estimate = await parseAvk5Estimate(readFileSync(localEstimatePath));
     const values: OrderForm = {

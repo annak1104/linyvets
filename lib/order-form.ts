@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { normalizeOfficialOrderPersonName, officialOrderPersonValue } from "@/lib/official-order-person-mapping";
+import { officialOrderPersonCertificate, officialOrderPersonProfileId, officialOrderPersonValue } from "@/lib/official-order-person-mapping";
 import { parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
 
 export const DEFAULT_ORDER_PARAGRAPH = "Затвердити зведений кошторис вартості робіт (робочий проєкт):";
@@ -59,10 +59,22 @@ function mappedRoleValue(
 ): string {
   const value = currentValue ?? "";
   const mappedValue = officialOrderPersonValue(sourceValue, role);
-  if (mappedValue && normalizeOfficialOrderPersonName(value) === normalizeOfficialOrderPersonName(sourceValue ?? "")) {
+  const sourceProfileId = officialOrderPersonProfileId(sourceValue, role);
+  const currentProfileId = officialOrderPersonProfileId(value, role);
+  if (mappedValue && sourceProfileId && sourceProfileId === currentProfileId) {
     return mappedValue;
   }
   return value;
+}
+
+export function officialOrderCertificateValue(
+  currentEngineer: string | null | undefined,
+  sourceEngineer: string | null | undefined,
+): string {
+  const sourceProfileId = officialOrderPersonProfileId(sourceEngineer, "chiefProjectEngineer");
+  const currentProfileId = officialOrderPersonProfileId(currentEngineer, "chiefProjectEngineer");
+  if (!sourceProfileId || sourceProfileId !== currentProfileId) return "";
+  return officialOrderPersonCertificate(sourceEngineer, "chiefProjectEngineer") ?? "";
 }
 
 export function buildOrderParagraphs(

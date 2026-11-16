@@ -38,7 +38,7 @@ test.describe("Лінивець complete workflow", () => {
     await expect(page.getByLabel(/Проєктна організація/)).toHaveValue("Ігор ШЕВЧУК");
     await expect(page.getByText("Кошторис успішно прочитано")).toBeVisible();
     await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("Проєктна організація: ФОП Шевчук І.В.");
-    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Головний інженер проєкту: Шевчук І.В.");
+    await expect(page.getByLabel("Абзац 4 · інженер")).toHaveValue("Головний інженер проєкту: Шевчук І.В. (сертифікат АТ № 007622)");
 
     await page.getByLabel("Абзац 3 · організація").fill("Організаційний абзац, відредагований вручну");
     await page.getByLabel(/Проєктна організація/).fill("Нове ім’я керівника");

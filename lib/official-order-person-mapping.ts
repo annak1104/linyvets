@@ -1,33 +1,33 @@
-export type OfficialOrderPersonRole = "projectOrganizationHead" | "chiefProjectEngineer";
+import { getOfficialOrderProfile, normalizePartyPersonName, type OfficialOrderPersonRole as PartyOfficialOrderPersonRole } from "@/lib/party-profiles";
 
-type OfficialOrderPersonMapping = {
-  sourceName: string;
-  projectOrganization: string;
-  chiefProjectEngineer: string;
-};
-
-const KNOWN_OFFICIAL_ORDER_PERSON_MAPPINGS: readonly OfficialOrderPersonMapping[] = [
-  {
-    sourceName: "ІГОР ШЕВЧУК",
-    projectOrganization: "ФОП Шевчук І.В.",
-    chiefProjectEngineer: "Шевчук І.В.",
-  },
-];
+export type { OfficialOrderPersonRole } from "@/lib/party-profiles";
 
 export function normalizeOfficialOrderPersonName(value: string): string {
-  return value.normalize("NFKC").replace(/\s+/gu, " ").trim().toLocaleUpperCase("uk-UA");
+  return normalizePartyPersonName(value);
+}
+
+export function officialOrderPersonProfileId(
+  personName: string | null | undefined,
+  role: PartyOfficialOrderPersonRole,
+): string | null {
+  return getOfficialOrderProfile(personName, role as PartyOfficialOrderPersonRole)?.id ?? null;
 }
 
 export function officialOrderPersonValue(
   sourceName: string | null | undefined,
-  role: OfficialOrderPersonRole,
+  role: PartyOfficialOrderPersonRole,
 ): string | null {
   if (!sourceName) return null;
 
-  const mapping = KNOWN_OFFICIAL_ORDER_PERSON_MAPPINGS.find(
-    (candidate) => normalizeOfficialOrderPersonName(candidate.sourceName) === normalizeOfficialOrderPersonName(sourceName),
-  );
-  if (!mapping) return null;
+  const profile = getOfficialOrderProfile(sourceName, role);
+  if (!profile?.officialOrder) return null;
 
-  return role === "projectOrganizationHead" ? mapping.projectOrganization : mapping.chiefProjectEngineer;
+  return role === "projectOrganizationHead" ? profile.officialOrder.projectOrganization : profile.officialOrder.chiefProjectEngineer;
+}
+
+export function officialOrderPersonCertificate(
+  sourceName: string | null | undefined,
+  role: PartyOfficialOrderPersonRole,
+): string | null {
+  return getOfficialOrderProfile(sourceName, role)?.certificate ?? null;
 }

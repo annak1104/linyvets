@@ -18,7 +18,7 @@ import {
 import type { Avk5ParseResult } from "@/lib/avk5-parser";
 import type { EstimateContext } from "@/lib/documents/types";
 import { amountInWordsUkrainian } from "@/lib/ua-currency-to-words";
-import { buildOrderParagraphs, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, officialOrderCertificateValue, type OrderForm } from "@/lib/order-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -85,6 +85,11 @@ export function ReviewEditStep({
         form.setValue(key, generated[key], { shouldDirty: false, shouldValidate: false });
       }
     }
+    const sourceEngineer = estimateContext?.people.chiefProjectEngineer.value;
+    const generatedCertificate = officialOrderCertificateValue(values.chiefProjectEngineer, sourceEngineer);
+    if (!form.formState.dirtyFields.certificate && form.getValues("certificate") !== generatedCertificate) {
+      form.setValue("certificate", generatedCertificate, { shouldDirty: false, shouldValidate: false });
+    }
   }, [estimateContext, form, form.formState.dirtyFields, values, values.certificate, values.chiefProjectEngineer, values.estimatedAmountInWords, values.estimatedAmountThousandsUah, values.projectName, values.projectOrganization]);
 
   return (
@@ -126,7 +131,7 @@ export function ReviewEditStep({
                 <Field label="Головний інженер проєкту" hint={fieldStateHint(parseResult?.data.chiefProjectEngineer, Boolean(form.formState.dirtyFields.chiefProjectEngineer))}>
                   <Input {...form.register("chiefProjectEngineer")} placeholder="Не знайдено" />
                 </Field>
-                <Field label="Сертифікат" hint={fieldStateHint(null, Boolean(form.formState.dirtyFields.certificate))}>
+                <Field label="Сертифікат" hint={officialOrderCertificateHint(values.certificate, values.chiefProjectEngineer, estimateContext?.people.chiefProjectEngineer.value, Boolean(form.formState.dirtyFields.certificate))}>
                   <Input {...form.register("certificate")} placeholder="Не зазначено у джерелі" />
                 </Field>
                 <Field label="Сума українською" hint="Автоматично">
@@ -248,6 +253,11 @@ function documentTypeLabel(type: Avk5ParseResult["data"]["documentType"]): strin
 function fieldStateHint(sourceValue: string | number | null | undefined, edited: boolean): string {
   if (edited) return "Змінено вручну";
   return sourceValue === null || sourceValue === undefined || sourceValue === "" ? "Не знайдено у джерелі" : "Знайдено у джерелі";
+}
+
+function officialOrderCertificateHint(currentValue: string, currentEngineer: string, sourceEngineer: string | null | undefined, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return officialOrderCertificateValue(currentEngineer, sourceEngineer) && currentValue.trim() ? "Автозаповнено з профілю" : "Не знайдено у джерелі";
 }
 
 function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: React.ReactNode }) {

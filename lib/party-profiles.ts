@@ -1,11 +1,19 @@
 import { z } from "zod";
 
 export const customerProfileIdSchema = z.literal("lutsk-city-department");
-export const contractorProfileIdSchema = z.enum(["probudkontrol", "ik-zahid", "fop-shevchuk"]);
+export const contractorProfileIdSchema = z.enum(["probudkontrol", "ik-zahid", "fop-shevchuk", "fop-kras"]);
 
 export type CustomerProfileId = z.infer<typeof customerProfileIdSchema>;
 export type ContractorProfileId = z.infer<typeof contractorProfileIdSchema>;
 export type ProfileVerificationStatus = "unverified";
+export type PartyLegalType = "ТОВ" | "ФОП" | "державний орган";
+export type OfficialOrderPersonRole = "projectOrganizationHead" | "chiefProjectEngineer";
+export type OfficialOrderProfileData = {
+  aliases: readonly string[];
+  roles: readonly OfficialOrderPersonRole[];
+  projectOrganization: string;
+  chiefProjectEngineer: string;
+};
 export type HistoricalReference = {
   value: string;
   sourceReference: string;
@@ -16,6 +24,7 @@ export type PartyProfile = {
   id: CustomerProfileId | ContractorProfileId;
   displayName: string;
   legalName: string;
+  legalType: PartyLegalType;
   address: string;
   identificationCode: string;
   iban: string | null;
@@ -29,6 +38,7 @@ export type PartyProfile = {
   signatureName: string;
   signaturePosition: string;
   certificate: string | null;
+  officialOrder?: OfficialOrderProfileData;
   taxStatus: string | null;
   authorizationBasis: HistoricalReference | null;
   verificationStatus: ProfileVerificationStatus;
@@ -40,6 +50,7 @@ export const customerProfile: PartyProfile & { id: CustomerProfileId } = {
   id: "lutsk-city-department",
   displayName: "Департамент житлово-комунального господарства Луцької міської ради",
   legalName: "Департамент житлово-комунального господарства Луцької міської ради",
+  legalType: "державний орган",
   address: "43016, м. Луцьк,\nвул. Б.Хмельницького, 40А",
   identificationCode: "34572192",
   iban: null,
@@ -69,6 +80,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     id: "probudkontrol",
     displayName: "ТОВ «ПроБудКонтроль»",
     legalName: "Товариство з обмеженою відповідальністю «ПроБудКонтроль»",
+    legalType: "ТОВ",
     address: "45653, Волинська обл., Луцький р-н,\nсело Чаруків, вулиця Шкільна, будинок 27",
     identificationCode: "46061310",
     iban: "UA233052990000026001040819781",
@@ -77,13 +89,17 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     bank: "АТ КБ «ПРИВАТБАНК»",
     contacts: "+380992294760",
     email: "probudkontrol@gmail.com",
-    representativeName: "О. В. Ношкалюк",
+    representativeName: "Ношкалюк Олександр Віталійович",
     representativePosition: "Директор",
     signatureName: "О. В. Ношкалюк",
     signaturePosition: "Директор",
     certificate: null,
     taxStatus: null,
-    authorizationBasis: null,
+    authorizationBasis: {
+      value: "виписка з Єдиного державного реєстру від 18.12.2025, № 1001871020000003582",
+      sourceReference: "Історичні реквізити, надані користувачем",
+      verificationStatus: "historical-reference",
+    },
     verificationStatus: "unverified",
     sourceReference: "Розрахунок Ветеранів.doc",
     missingFields: ["certificate", "taxStatus"],
@@ -92,6 +108,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     id: "ik-zahid",
     displayName: "ТОВ «ІК ЗАХІД»",
     legalName: "Товариство з обмеженою відповідальністю «ІК ЗАХІД»",
+    legalType: "ТОВ",
     address: "45744, Волинська обл., Луцький р-н,\nсело Широке, вулиця Молодіжна, буд.  6",
     identificationCode: "45709671",
     iban: "UA973003350000000260012375294",
@@ -100,13 +117,17 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     bank: "АТ  «РАЙФФАЙЗЕН БАНК»",
     contacts: "+380992781647",
     email: "ikzahid123@gmail.com",
-    representativeName: "В.В.Войтович",
+    representativeName: "Войтович Володимир Васильович",
     representativePosition: "Директор",
     signatureName: "В.В.Войтович",
     signaturePosition: "Директор",
     certificate: null,
     taxStatus: null,
-    authorizationBasis: null,
+    authorizationBasis: {
+      value: "Статут, затверджений установчими зборами засновників, протокол від 30.01.2025 № 1.",
+      sourceReference: "Історичні реквізити, надані користувачем",
+      verificationStatus: "historical-reference",
+    },
     verificationStatus: "unverified",
     sourceReference: "Розрахунок.doc",
     missingFields: ["certificate", "taxStatus"],
@@ -115,6 +136,7 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     id: "fop-shevchuk",
     displayName: "ФОП Шевчук Ігор Вікторович",
     legalName: "ФОП Шевчук Ігор Вікторович",
+    legalType: "ФОП",
     address: "45630, Волинська обл., Луцький район,  село Милушин, вул. Хутірська, 59а",
     identificationCode: "3171009013",
     iban: "UA113033980000026009500700621",
@@ -127,12 +149,50 @@ export const contractorProfiles: readonly (PartyProfile & { id: ContractorProfil
     representativePosition: "ФОП",
     signatureName: "І. В. Шевчук",
     signaturePosition: "ФОП",
-    certificate: null,
+    certificate: "АТ № 007622",
+    officialOrder: {
+      aliases: ["ІГОР ШЕВЧУК", "Ігор Шевчук", "Шевчук І.В.", "Шевчук І. В.", "І. В. Шевчук", "ФОП Шевчук Ігор Вікторович"],
+      roles: ["projectOrganizationHead", "chiefProjectEngineer"],
+      projectOrganization: "ФОП Шевчук І.В.",
+      chiefProjectEngineer: "Шевчук І.В.",
+    },
     taxStatus: null,
-    authorizationBasis: null,
+    authorizationBasis: {
+      value: "виписка з Єдиного державного реєстру від 14.06.2017, № 2 182 000 0000 002106",
+      sourceReference: "Історичні реквізити, надані користувачем",
+      verificationStatus: "historical-reference",
+    },
     verificationStatus: "unverified",
     sourceReference: "Розрахунок технічного нагляду ПР Мостозагін.doc",
-    missingFields: ["email", "certificate", "taxStatus"],
+    missingFields: ["email", "taxStatus"],
+  },
+  {
+    id: "fop-kras",
+    displayName: "ФОП Крась Юрій Ігорович",
+    legalName: "ФОП Крась Юрій Ігорович",
+    legalType: "ФОП",
+    address: "м. Луцьк, вул. Рилєєва, 8",
+    identificationCode: "3080704216",
+    iban: "UA133052990000026004040804630",
+    sourceIbanText: null,
+    accountPrefix: "р/р №",
+    bank: "АТ КБ «ПриватБанк»",
+    contacts: "0661475994",
+    email: null,
+    representativeName: "Крась Юрій Ігорович",
+    representativePosition: "ФОП",
+    signatureName: "Крась Ю.І.",
+    signaturePosition: "ФОП",
+    certificate: "АТ № 007840",
+    taxStatus: "Єдина група оподаткування, III група",
+    authorizationBasis: {
+      value: "виписка з Єдиного державного реєстру від 17.10.2019 № 2 198 000 0000 033585",
+      sourceReference: "Історичні реквізити, надані користувачем",
+      verificationStatus: "historical-reference",
+    },
+    verificationStatus: "unverified",
+    sourceReference: "Історичні реквізити, надані користувачем",
+    missingFields: ["email"],
   },
 ] as const;
 
@@ -148,6 +208,19 @@ export function getContractorProfile(id: ContractorProfileId): PartyProfile & { 
   const profile = contractorProfiles.find((item) => item.id === id);
   if (!profile) throw new Error(`Unknown contractor profile: ${id}`);
   return profile;
+}
+
+export function normalizePartyPersonName(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/gu, " ").trim().toLocaleUpperCase("uk-UA");
+}
+
+export function getOfficialOrderProfile(
+  personName: string | null | undefined,
+  role: OfficialOrderPersonRole,
+): (PartyProfile & { id: ContractorProfileId }) | null {
+  if (!personName) return null;
+  const normalizedName = normalizePartyPersonName(personName);
+  return contractorProfiles.find((profile) => profile.officialOrder?.roles.includes(role) && profile.officialOrder.aliases.some((alias) => normalizePartyPersonName(alias) === normalizedName)) ?? null;
 }
 
 export function formatPartyDetails(profile: PartyProfile): string {

@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { parseAvk5Estimate } from "@/lib/avk5-parser";
 import { createEstimateContext } from "@/lib/documents/estimate-context";
-import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, emptyTechnicalSupervisionContractValues, suggestedContractEndDate } from "@/lib/technical-supervision-contract";
+import type { ContractorProfileId } from "@/lib/party-profiles";
+import { buildTechnicalSupervisionContractDefaults, buildTechnicalSupervisionContractTemplateValues, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, EMPTY_CONTRACT_NUMBER_PLACEHOLDER, EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER, HISTORICAL_CONTRACTOR_TAX_STATUS, HISTORICAL_CUSTOMER_TAX_STATUS, emptyTechnicalSupervisionContractValues, technicalSupervisionContractSchema } from "@/lib/technical-supervision-contract";
 import { loadTechnicalSupervisionContractTemplate } from "@/lib/technical-supervision-contract-template";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
 
@@ -23,15 +24,78 @@ describe("technical supervision contract", () => {
     expect(defaults.customerDetails).toContain("р/р №");
     expect(defaults.contractorDetails).toContain("ФОП Шевчук Ігор Вікторович");
     expect(defaults.contractorDetails).toContain("UA113033980000026009500700621");
-    expect(defaults.contractorCertificate).toBe("");
+    expect(defaults.contractorCertificate).toBe("АТ № 007622");
+    expect(defaults.contractorAuthorizationBasis).toBe("виписка з Єдиного державного реєстру від 14.06.2017, № 2 182 000 0000 002106");
     expect(defaults.customerLegalBasis).toBe("Положення про департамент, затверджене рішенням Луцької міської ради від 29.06.2017 № 26/12");
-    expect(defaults.contractEndDate).toBe("31.12.2026");
+    expect(defaults.customerTaxStatus).toBe(HISTORICAL_CUSTOMER_TAX_STATUS);
+    expect(defaults.contractorTaxStatus).toBe(HISTORICAL_CONTRACTOR_TAX_STATUS);
+    expect(defaults.contractEndDate).toBe("");
     expect(defaults.appendixReference).toBe("Розрахунок кошторисної вартості технічного нагляду");
   });
 
-  it("offers the historical end date only for a 2026 contract context", () => {
-    expect(suggestedContractEndDate(new Date("2026-01-01T00:00:00.000Z"))).toBe("31.12.2026");
-    expect(suggestedContractEndDate(new Date("2027-01-01T00:00:00.000Z"))).toBe("");
+  it("maps each contractor profile to its own authorization and certificate data", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/67_КД_ЗКР.rtf")));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+    const expected = {
+      probudkontrol: {
+        authorization: "виписка з Єдиного державного реєстру від 18.12.2025, № 1001871020000003582",
+        certificate: "",
+      },
+      "ik-zahid": {
+        authorization: "Статут, затверджений установчими зборами засновників, протокол від 30.01.2025 № 1.",
+        certificate: "",
+      },
+      "fop-shevchuk": {
+        authorization: "виписка з Єдиного державного реєстру від 14.06.2017, № 2 182 000 0000 002106",
+        certificate: "АТ № 007622",
+      },
+      "fop-kras": {
+        authorization: "виписка з Єдиного державного реєстру від 17.10.2019 № 2 198 000 0000 033585",
+        certificate: "АТ № 007840",
+      },
+    } as const;
+
+    for (const [profileId, profileExpected] of Object.entries(expected)) {
+      const defaults = buildTechnicalSupervisionContractDefaults(context, { contractorProfileId: profileId as ContractorProfileId });
+      expect(defaults.contractorAuthorizationBasis).toBe(profileExpected.authorization);
+      expect(defaults.contractorCertificate).toBe(profileExpected.certificate);
+    }
+
+    const fopWithoutCertificate = buildTechnicalSupervisionContractDefaults(context, { contractorProfileId: "fop-shevchuk" });
+    expect(technicalSupervisionContractSchema.safeParse({ ...fopWithoutCertificate, contractorCertificate: "" }).success).toBe(false);
+    const tovWithoutCertificate = buildTechnicalSupervisionContractDefaults(context, { contractorProfileId: "ik-zahid" });
+    expect(technicalSupervisionContractSchema.safeParse({ ...tovWithoutCertificate, contractorCertificate: "" }).success).toBe(true);
+    expect(buildTechnicalSupervisionContractTemplateValues({ ...tovWithoutCertificate, contractorCertificate: "" }).contractorCertificateClause).toBe("");
+    expect(buildTechnicalSupervisionContractTemplateValues({ ...tovWithoutCertificate, contractorCertificate: "АТ № ручний" }).contractorCertificateClause).toBe(" та АТ № ручний");
+  });
+
+  it("accepts empty, partially completed, and fully completed contract details", async () => {
+    const parsed = await parseAvk5Estimate(readFileSync(resolve(process.cwd(), "reference/67_КД_ЗКР.rtf")));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+    const defaults = buildTechnicalSupervisionContractDefaults(context);
+    const requiredValues = {
+      ...defaults,
+      contractorCertificate: "АТ № 000000",
+      customerTaxStatus: "потребує підтвердження",
+      contractorTaxStatus: "потребує підтвердження",
+    };
+
+    expect(technicalSupervisionContractSchema.safeParse(requiredValues).success).toBe(true);
+    const emptyTemplateValues = buildTechnicalSupervisionContractTemplateValues(requiredValues);
+    expect(emptyTemplateValues.contractNumber).toBe(EMPTY_CONTRACT_NUMBER_PLACEHOLDER);
+    expect(emptyTemplateValues.documentDate).toBe(EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER);
+    expect(emptyTemplateValues.contractEndDate).toBe(EMPTY_CONTRACT_END_DATE_PLACEHOLDER);
+
+    const partialValues = { ...requiredValues, contractNumber: "01/26" };
+    expect(technicalSupervisionContractSchema.safeParse(partialValues).success).toBe(true);
+    expect(buildTechnicalSupervisionContractTemplateValues(partialValues).contractNumber).toBe("01/26");
+
+    const completedValues = { ...partialValues, documentDate: "12 травня 2026", contractEndDate: "31.12.2026" };
+    expect(technicalSupervisionContractSchema.safeParse(completedValues).success).toBe(true);
+    expect(buildTechnicalSupervisionContractTemplateValues(completedValues).documentDate).toBe("«12 травня 2026»");
+    expect(buildTechnicalSupervisionContractTemplateValues(completedValues).contractEndDate).toBe("31.12.2026");
+    expect(buildTechnicalSupervisionContractTemplateValues(completedValues).customerTaxStatus).toBe("потребує підтвердження");
+    expect(buildTechnicalSupervisionContractTemplateValues(completedValues).contractorTaxStatus).toBe("потребує підтвердження");
   });
 
   it("recomputes the amount and keeps repeated fields synchronized", () => {
@@ -74,7 +138,7 @@ describe("technical supervision contract", () => {
     const placeholders = [...xml.matchAll(/\{\{([^}]+)\}\}/g)].map((match) => match[1]).sort();
 
     expect(placeholders).toEqual([
-      "appendixReference", "calculationRatePercent", "chapters1To9TotalUah", "contractEndDate", "contractNumber", "contractorCertificate", "contractorDetails", "contractorName", "contractorRegistrationDetails", "contractorSignature", "contractorSignatureTitle", "contractorTaxStatus", "customerDetails", "customerLegalBasis", "customerName", "customerRepresentative", "customerSignature", "customerSignatureTitle", "customerTaxStatus", "documentDate", "projectName", "supervisionAmountInWords", "supervisionAmountUah",
+      "appendixReference", "calculationRatePercent", "chapters1To9TotalUah", "contractEndDate", "contractNumber", "contractorAuthorizationBasis", "contractorCertificateClause", "contractorDetails", "contractorName", "contractorSignature", "contractorSignatureTitle", "contractorTaxStatus", "customerDetails", "customerLegalBasis", "customerName", "customerRepresentative", "customerSignature", "customerSignatureTitle", "customerTaxStatus", "documentDate", "projectName", "supervisionAmountInWords", "supervisionAmountUah",
     ]);
     expect(xml).toContain("<w:tbl");
     expect(xml).toContain("w:pgMar");

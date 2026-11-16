@@ -23,7 +23,7 @@ import { createEstimateContext } from "@/lib/documents/estimate-context";
 import { defaultSelectedDocumentIds, documentRegistry } from "@/lib/documents/registry";
 import type { DocumentId, EstimateContext } from "@/lib/documents/types";
 import { batchZipFilename } from "@/lib/batch-generation";
-import { buildOrderParagraphs, emptyOrderValues, orderSchema, type OrderForm } from "@/lib/order-form";
+import { buildOrderParagraphs, emptyOrderValues, officialOrderCertificateValue, orderSchema, type OrderForm } from "@/lib/order-form";
 import { buildTechnicalSupervisionCalculationDefaults, emptyTechnicalSupervisionCalculationValues, technicalSupervisionCalculationSchema, type TechnicalSupervisionCalculationForm } from "@/lib/technical-supervision-calculation";
 import { buildTechnicalSupervisionContractDefaults, emptyTechnicalSupervisionContractValues, syncContractFromCalculation, technicalSupervisionContractSchema, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,7 @@ export function GeneratorWorkspace() {
   useEffect(() => {
     const synced = syncContractFromCalculation(contractForm.getValues(), watchedCalculationValues);
     const dirtyFields = contractForm.formState.dirtyFields;
-    const sharedFields: (keyof TechnicalSupervisionContractForm)[] = ["projectName", "chapters1To9TotalUah", "customerProfileId", "contractorProfileId", "customerName", "contractorName", "contractorRegistrationDetails", "contractNumber", "documentDate", "customerDetails", "customerRepresentative", "customerSignature", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "calculationRatePercent"];
+    const sharedFields: (keyof TechnicalSupervisionContractForm)[] = ["projectName", "chapters1To9TotalUah", "customerProfileId", "contractorProfileId", "customerName", "contractorName", "contractorRegistrationDetails", "contractorAuthorizationBasis", "contractorCertificate", "contractorTaxStatus", "contractNumber", "documentDate", "customerDetails", "customerRepresentative", "customerSignature", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "calculationRatePercent"];
     for (const field of sharedFields) {
       if (!dirtyFields[field]) contractForm.setValue(field, synced[field], { shouldDirty: false, shouldValidate: false });
     }
@@ -174,21 +174,20 @@ export function GeneratorWorkspace() {
       calculationForm.reset(calculationDefaults);
       contractForm.reset(buildTechnicalSupervisionContractDefaults(context, calculationDefaults));
       const amountText = context.totals.final.value?.text ?? "";
+      const sourcePeople = {
+        projectOrganizationHead: context.people.projectOrganizationHead.value,
+        chiefProjectEngineer: context.people.chiefProjectEngineer.value,
+      };
       const nextValues: OrderForm = {
         ...emptyOrderValues,
         projectName: context.project.name.value ?? "",
         projectOrganization: context.people.projectOrganizationHead.value ?? "",
         chiefProjectEngineer: context.people.chiefProjectEngineer.value ?? "",
+        certificate: officialOrderCertificateValue(context.people.chiefProjectEngineer.value, context.people.chiefProjectEngineer.value),
         estimatedAmountThousandsUah: amountText,
         estimatedAmountInWords: amountText ? amountInWordsUkrainian(amountText) : "",
       };
-      form.reset({
-        ...nextValues,
-        ...buildOrderParagraphs(nextValues, {
-          projectOrganizationHead: context.people.projectOrganizationHead.value,
-          chiefProjectEngineer: context.people.chiefProjectEngineer.value,
-        }),
-      });
+      form.reset({ ...nextValues, ...buildOrderParagraphs(nextValues, sourcePeople) });
       setParseResult(result);
       setStep(2);
     } catch (error) {

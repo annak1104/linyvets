@@ -29,27 +29,29 @@ const decimalText = z.string().trim().min(1, "Вкажіть значення").
 }, "Введіть коректну невід’ємну ставку");
 
 const requiredText = z.string().trim().min(1, "Підтвердіть це поле");
-export const HISTORICAL_CONTRACT_END_DATE_2026 = "31.12.2026";
+const optionalText = z.string().trim();
 export const CONTRACT_APPENDIX_REFERENCE = "Розрахунок кошторисної вартості технічного нагляду";
-
-export function suggestedContractEndDate(now = new Date()): string {
-  return now.getFullYear() === 2026 ? HISTORICAL_CONTRACT_END_DATE_2026 : "";
-}
+export const HISTORICAL_CUSTOMER_TAX_STATUS = "не є платником податку";
+export const HISTORICAL_CONTRACTOR_TAX_STATUS = "є платником Єдиного податку 5%";
+export const EMPTY_CONTRACT_NUMBER_PLACEHOLDER = "__________";
+export const EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER = "«____» __________ 2026 року";
+export const EMPTY_CONTRACT_END_DATE_PLACEHOLDER = "**.**.2026";
 
 export const technicalSupervisionContractSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
   customerProfileId: customerProfileIdSchema,
   contractorProfileId: contractorProfileIdSchema,
   chapters1To9TotalUah: decimalText,
-  contractNumber: requiredText,
-  documentDate: requiredText,
-  contractEndDate: requiredText,
+  contractNumber: optionalText,
+  documentDate: optionalText,
+  contractEndDate: optionalText,
   customerName: requiredText,
   customerRepresentative: requiredText,
   customerLegalBasis: requiredText,
   contractorName: requiredText,
   contractorRegistrationDetails: requiredText,
-  contractorCertificate: requiredText,
+  contractorAuthorizationBasis: requiredText,
+  contractorCertificate: optionalText,
   calculationRatePercent: decimalText,
   supervisionAmountUah: z.string(),
   supervisionAmountInWords: z.string(),
@@ -62,6 +64,11 @@ export const technicalSupervisionContractSchema = z.object({
   contractorDetails: requiredText,
   contractorSignatureTitle: requiredText,
   contractorSignature: requiredText,
+}).superRefine((data, context) => {
+  const contractor = getContractorProfile(data.contractorProfileId);
+  if (contractor.legalType === "ФОП" && !data.contractorCertificate) {
+    context.addIssue({ path: ["contractorCertificate"], code: "custom", message: "Підтвердіть це поле" });
+  }
 });
 
 export type TechnicalSupervisionContractForm = z.infer<typeof technicalSupervisionContractSchema>;
@@ -79,12 +86,13 @@ export const emptyTechnicalSupervisionContractValues: TechnicalSupervisionContra
   customerLegalBasis: "",
   contractorName: "",
   contractorRegistrationDetails: "",
+  contractorAuthorizationBasis: "",
   contractorCertificate: "",
   calculationRatePercent: "1,1",
   supervisionAmountUah: "",
   supervisionAmountInWords: "",
-  customerTaxStatus: "",
-  contractorTaxStatus: "",
+  customerTaxStatus: HISTORICAL_CUSTOMER_TAX_STATUS,
+  contractorTaxStatus: HISTORICAL_CONTRACTOR_TAX_STATUS,
   appendixReference: CONTRACT_APPENDIX_REFERENCE,
   customerDetails: "",
   customerSignatureTitle: "Директор",
@@ -117,18 +125,22 @@ export function buildTechnicalSupervisionContractDefaults(
     contractorProfileId: calculation?.contractorProfileId ?? calculationDefaults.contractorProfileId,
     contractNumber: calculation?.contractNumber ?? "",
     documentDate: calculation?.documentDate ?? "",
-    contractEndDate: suggestedContractEndDate(),
+    contractEndDate: "",
     customerName: customer.legalName,
     customerDetails: calculation?.customerDetails ?? formatPartyDetails(customer),
     customerRepresentative: calculation?.customerDirector ?? customer.representativeName,
     customerLegalBasis: customer.authorizationBasis?.value ?? "",
+    customerTaxStatus: customer.taxStatus ?? HISTORICAL_CUSTOMER_TAX_STATUS,
     customerSignatureTitle: customer.signaturePosition,
     customerSignature: calculation?.customerDirector ?? customer.signatureName,
     contractorName: contractor.legalName,
     contractorRegistrationDetails: `код ЄДРПОУ ${contractor.identificationCode}`,
+    contractorAuthorizationBasis: contractor.authorizationBasis?.value ?? "",
+    contractorCertificate: contractor.certificate ?? "",
     contractorDetails: calculation?.contractorDetails ?? formatPartyDetails(contractor),
     contractorSignatureTitle: calculation?.contractorSignatureTitle ?? contractor.signaturePosition,
     contractorSignature: calculation?.contractorSignature ?? contractor.signatureName,
+    contractorTaxStatus: contractor.taxStatus ?? HISTORICAL_CONTRACTOR_TAX_STATUS,
     calculationRatePercent: calculation?.calculationRatePercent ?? calculationDefaults.calculationRatePercent,
   };
 
@@ -143,15 +155,17 @@ export function buildTechnicalSupervisionContractTemplateValues(data: TechnicalS
   return {
     projectName: data.projectName,
     chapters1To9TotalUah: formatUahValue(data.chapters1To9TotalUah),
-    contractNumber: data.contractNumber,
-    documentDate: data.documentDate,
-    contractEndDate: data.contractEndDate,
+    contractNumber: data.contractNumber || EMPTY_CONTRACT_NUMBER_PLACEHOLDER,
+    documentDate: data.documentDate ? `«${data.documentDate}»` : EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER,
+    contractEndDate: data.contractEndDate || EMPTY_CONTRACT_END_DATE_PLACEHOLDER,
     customerName: data.customerName,
     customerRepresentative: data.customerRepresentative,
     customerLegalBasis: data.customerLegalBasis,
     contractorName: data.contractorName,
     contractorRegistrationDetails: data.contractorRegistrationDetails,
+    contractorAuthorizationBasis: data.contractorAuthorizationBasis,
     contractorCertificate: data.contractorCertificate,
+    contractorCertificateClause: data.contractorCertificate.trim() ? ` та ${data.contractorCertificate}` : "",
     calculationRatePercent: data.calculationRatePercent.replace(/\s+/g, ""),
     supervisionAmountUah: derived.supervisionAmountUah,
     supervisionAmountInWords: derived.supervisionAmountInWords,
@@ -182,6 +196,9 @@ export function syncContractFromCalculation(
     customerName: customer.legalName,
     contractorName: contractor.legalName,
     contractorRegistrationDetails: `код ЄДРПОУ ${contractor.identificationCode}`,
+    contractorAuthorizationBasis: contractor.authorizationBasis?.value ?? contract.contractorAuthorizationBasis,
+    contractorCertificate: contractor.certificate ?? "",
+    contractorTaxStatus: contractor.taxStatus?.trim() || HISTORICAL_CONTRACTOR_TAX_STATUS,
     contractNumber: calculation.contractNumber ?? contract.contractNumber,
     documentDate: calculation.documentDate ?? contract.documentDate,
     customerDetails: calculation.customerDetails ?? contract.customerDetails,

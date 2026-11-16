@@ -49,26 +49,16 @@ describe("TechnicalSupervisionCalculationStep", () => {
     expect(screen.getByLabelText("Живий перегляд розрахунку технічного нагляду").textContent).toContain("2 657,03");
   });
 
-  it("shows missing-data validation and submits after mandatory details are filled", async () => {
+  it("submits with empty optional shared contract details", async () => {
     const onSubmit = vi.fn(async () => undefined);
     render(<Harness onSubmit={onSubmit} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Сформувати розрахунок" }));
-    await waitFor(() => expect(screen.getAllByText("Підтвердіть це поле").length).toBeGreaterThan(0));
-    expect(onSubmit).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByLabelText(/Номер договору/), { target: { value: "01/26" } });
-    fireEvent.change(screen.getByLabelText(/Дата документа/), { target: { value: "12 травня 2026" } });
-    fireEvent.change(screen.getByLabelText(/Реквізити замовника/), { target: { value: "Замовник\nАдреса" } });
-    fireEvent.change(screen.getByLabelText(/Директор замовника/), { target: { value: "Директор" } });
-    fireEvent.change(screen.getByLabelText(/Реквізити виконавця/), { target: { value: "Виконавець\nАдреса" } });
-    fireEvent.change(screen.getByLabelText(/Посада виконавця/), { target: { value: "ФОП" } });
-    fireEvent.change(screen.getByLabelText(/Підпис виконавця/), { target: { value: "Підписант" } });
-    fireEvent.click(screen.getByRole("button", { name: "Сформувати розрахунок" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText(/Номер договору/)).toHaveProperty("value", "");
+    expect(screen.getByLabelText(/Дата документа/)).toHaveProperty("value", "");
 
     expect(screen.queryByRole("checkbox", { name: /актуальність реквізитів/i })).toBeNull();
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
   });
 
   it("switches contractor profiles and protects manual edits", () => {

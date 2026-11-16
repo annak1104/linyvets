@@ -35,6 +35,10 @@ describe("TechnicalSupervisionContractStep", () => {
     render(<Harness />);
     expect(screen.getByLabelText(/Назва об’єкта/)).toHaveProperty("value", "Поточний ремонт зупинки громадського транспорту Волинської області");
     expect(screen.getByLabelText(/Сума договору, грн/)).toHaveProperty("value", "1 948,49");
+    expect(screen.getByLabelText(/Податковий статус замовника/)).toHaveProperty("value", "не є платником податку");
+    expect(screen.getByLabelText(/Податковий статус виконавця/)).toHaveProperty("value", "є платником Єдиного податку 5%");
+    expect(screen.getByLabelText(/Кваліфікаційний сертифікат/)).toHaveProperty("value", "АТ № 007622");
+    expect(screen.getAllByText("Історичний шаблон — перевірте")).toHaveLength(2);
     expect(screen.getByText(/історичне посилання/)).toBeTruthy();
     expect(screen.getByText(/1,5 %/)).toBeTruthy();
     const preview = screen.getByLabelText("Попередній перегляд договору");
@@ -42,20 +46,21 @@ describe("TechnicalSupervisionContractStep", () => {
     expect(preview.textContent).toContain("5. Права і обов’язки Виконавця.");
     expect(preview.textContent).toContain("11. Інші умови.");
     expect(preview.textContent).toContain("12. Юридичні адреси, банківські реквізити і підписи Сторін.");
+    expect(preview.textContent).toContain("виписка з Єдиного державного реєстру від 14.06.2017, № 2 182 000 0000 002106");
 
     fireEvent.change(screen.getByLabelText(/Ставка розрахунку, %/), { target: { value: "1,5" } });
     await waitFor(() => expect(screen.getByLabelText(/Сума договору, грн/)).toHaveProperty("value", "2 657,03"));
     expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain("2 657,03");
+    expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).toContain("11.6. Замовник своїм підписом підтверджує, що він не є платником податку, Виконавець своїм підписом підтверджує, що він є платником Єдиного податку 5%.");
   });
 
-  it("shows missing-data indicators without blocking on profile confirmation", async () => {
+  it("submits with profile-backed legal data without extra confirmation controls", async () => {
     const onSubmit = vi.fn(async () => undefined);
     render(<Harness onSubmit={onSubmit} />);
     fireEvent.click(screen.getByRole("button", { name: "Сформувати договір" }));
-    await waitFor(() => expect(screen.getAllByText("Підтвердіть це поле").length).toBeGreaterThan(0));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
     expect(screen.queryByRole("checkbox", { name: /актуальність реквізитів/i })).toBeNull();
     expect(screen.getAllByText(/Автозаповнено з профілю/).length).toBeGreaterThan(0);
-    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("warns before replacing edited contractor data and keeps profile-specific details isolated", () => {
@@ -75,7 +80,34 @@ describe("TechnicalSupervisionContractStep", () => {
     expect((screen.getByLabelText("Профіль виконавця") as HTMLSelectElement).value).toBe("ik-zahid");
     expect((screen.getByLabelText(/Реквізити виконавця/) as HTMLTextAreaElement).value).toContain("ІК ЗАХІД");
     expect((screen.getByLabelText(/Реєстраційні дані виконавця/) as HTMLTextAreaElement).value).toBe("код ЄДРПОУ 45709671");
-    expect((screen.getByLabelText(/Податковий статус виконавця/) as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText(/Підстава повноважень\/реєстрації виконавця/) as HTMLTextAreaElement).value).toBe("Статут, затверджений установчими зборами засновників, протокол від 30.01.2025 № 1.");
+    expect((screen.getByLabelText(/Кваліфікаційний сертифікат/) as HTMLInputElement).value).toBe("");
+    expect(screen.getByText("Необов'язкове поле")).toBeTruthy();
+    expect((screen.getByLabelText(/Податковий статус виконавця/) as HTMLInputElement).value).toBe("є платником Єдиного податку 5%");
+    expect(screen.getByLabelText("Живий перегляд договору технічного нагляду").textContent).not.toContain("та , з другої сторони");
     confirm.mockRestore();
+  });
+
+  it("preserves manually edited tax status when switching contractor profiles", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<Harness />);
+
+    fireEvent.change(screen.getByLabelText(/Податковий статус виконавця/), { target: { value: "потребує окремої перевірки" } });
+    fireEvent.change(screen.getByLabelText("Профіль виконавця"), { target: { value: "ik-zahid" } });
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect((screen.getByLabelText(/Податковий статус виконавця/) as HTMLInputElement).value).toBe("потребує окремої перевірки");
+    confirm.mockRestore();
+  });
+
+  it("maps the fourth contractor profile to its own certificate and authorization", () => {
+    render(<Harness />);
+
+    fireEvent.change(screen.getByLabelText("Профіль виконавця"), { target: { value: "fop-kras" } });
+
+    expect(screen.getByLabelText(/Назва виконавця/)).toHaveProperty("value", "ФОП Крась Юрій Ігорович");
+    expect(screen.getByLabelText(/Підстава повноважень\/реєстрації виконавця/)).toHaveProperty("value", "виписка з Єдиного державного реєстру від 17.10.2019 № 2 198 000 0000 033585");
+    expect(screen.getByLabelText(/Кваліфікаційний сертифікат/)).toHaveProperty("value", "АТ № 007840");
+    expect(screen.getByLabelText(/Податковий статус виконавця/)).toHaveProperty("value", "Єдина група оподаткування, III група");
   });
 });

@@ -64,12 +64,12 @@ def create_template(source: Path, destination: Path) -> None:
             raise RuntimeError(f"Unexpected source structure: {len(paragraphs)} body paragraphs.")
 
         replace_paragraph_text(paragraphs[find_index(paragraphs, "Д О Г О В І Р")], "Д О Г О В І Р № {{contractNumber}}")
-        replace_paragraph_text(paragraphs[find_index(paragraphs, "м. Луцьк")], "м. Луцьк                                                                                «{{documentDate}}»")
+        replace_paragraph_text(paragraphs[find_index(paragraphs, "м. Луцьк")], "м. Луцьк                                                                                {{documentDate}}")
 
         intro_index = find_index(paragraphs, "Департамент житлово-комунального господарства Луцької міської ради")
         replace_paragraph_text(
             paragraphs[intro_index],
-            "{{customerName}} (далі - Замовник) в особі {{customerRepresentative}}, що діє на підставі {{customerLegalBasis}}, з однієї сторони, та {{contractorName}}, що діє на підставі {{contractorRegistrationDetails}} та {{contractorCertificate}}, з другої сторони, разом іменовані «Сторони», уклали цей Договір на виконання технічного нагляду (надалі – Договір) про нижчезазначене:",
+            "{{customerName}} (далі - Замовник) в особі {{customerRepresentative}}, що діє на підставі {{customerLegalBasis}}, з однієї сторони, та {{contractorName}}, що діє на підставі {{contractorAuthorizationBasis}}{{contractorCertificateClause}}, з другої сторони, разом іменовані «Сторони», уклали цей Договір на виконання технічного нагляду (надалі – Договір) про нижчезазначене:",
             prefer_regular_run=True,
         )
 

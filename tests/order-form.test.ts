@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildOrderParagraphs } from "@/lib/order-form";
+import { buildOrderParagraphs, officialOrderCertificateValue } from "@/lib/order-form";
 
 const baseValues = {
   projectName: "Тестовий проєкт",
@@ -22,6 +22,13 @@ describe("official order person defaults", () => {
 
       expect(paragraphs.orderParagraph3).toBe("Проєктна організація: ФОП Шевчук І.В.");
       expect(paragraphs.orderParagraph4).toBe("Головний інженер проєкту: Шевчук І.В.");
+    },
+  );
+
+  it.each(["Ігор ШЕВЧУК", "Ігор Шевчук", "Шевчук І.В.", "Шевчук І. В."]) (
+    "resolves the approved certificate from the matched chief-engineer profile: %s",
+    (sourceName) => {
+      expect(officialOrderCertificateValue(sourceName, sourceName)).toBe("АТ № 007622");
     },
   );
 
@@ -62,6 +69,11 @@ describe("official order person defaults", () => {
 
     expect(paragraphs.orderParagraph3).toBe("Проєктна організація: Ігор ШЕВЧУК");
     expect(paragraphs.orderParagraph4).toBe("Головний інженер проєкту: Ігор ШЕВЧУК");
+  });
+
+  it("does not assign a certificate from surname alone or an unrelated engineer", () => {
+    expect(officialOrderCertificateValue("Шевчук", "Шевчук")).toBe("");
+    expect(officialOrderCertificateValue("Петро ІВАНЕНКО", "Ігор ШЕВЧУК")).toBe("");
   });
 
   it("keeps a manually edited role value as an ordinary editable value", () => {

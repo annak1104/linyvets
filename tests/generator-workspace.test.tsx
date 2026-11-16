@@ -56,6 +56,8 @@ describe("GeneratorWorkspace document session", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]).toBe("/api/parse-estimate");
     expect(screen.getByRole("checkbox", { name: "Наказ про затвердження кошторису" })).toHaveProperty("checked", true);
+    expect(screen.getByLabelText(/Сертифікат/)).toHaveProperty("value", "АТ № 007622");
+    expect(screen.getByText("Автозаповнено з профілю")).toBeTruthy();
   });
 });
 

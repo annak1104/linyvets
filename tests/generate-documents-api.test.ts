@@ -145,6 +145,23 @@ describe("POST /api/generate-documents", () => {
     }
   });
 
+  it.each(["probudkontrol", "ik-zahid", "fop-shevchuk", "fop-kras"] as const)("generates a contract ZIP for %s without certificate leakage", async (contractorProfileId) => {
+    const parsed = await parseAvk5Estimate(readFileSync(sourcePath));
+    const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
+    const contract = buildTechnicalSupervisionContractDefaults(context, { contractorProfileId });
+    const response = await POST(requestFor([{ id: "technical-supervision-contract", data: contract }]));
+    const archive = Buffer.from(await response.arrayBuffer());
+    const entries = archiveEntries(archive);
+    const xml = documentXml(new PizZip(archive).file(entries[0])!.asNodeBuffer()).replaceAll("&quot;", '"');
+
+    expect(response.status).toBe(200);
+    expect(entries).toHaveLength(1);
+    expect(xml).toContain(contract.contractorName);
+    if (contract.contractorCertificate) expect(xml).toContain(contract.contractorCertificate);
+    expect(xml).not.toContain("та , з другої сторони");
+    expect(xml).not.toContain("{{");
+  });
+
   it("reports per-document validation errors and does not return a partial ZIP", async () => {
     const documents = await buildDocuments();
     const response = await POST(requestFor([

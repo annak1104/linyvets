@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, FileCheck2, FileSpreadsheet, Info, LoaderCircle,
 import type { EstimateContext } from "@/lib/documents/types";
 import { contractorProfiles, formatPartyDetails, getContractorProfile, getCustomerProfile } from "@/lib/party-profiles";
 import { contractPreviewSections } from "@/lib/technical-supervision-contract-content";
-import { buildTechnicalSupervisionContractTemplateValues, CONTRACT_APPENDIX_REFERENCE, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
+import { buildTechnicalSupervisionContractTemplateValues, CONTRACT_APPENDIX_REFERENCE, EMPTY_CONTRACT_END_DATE_PLACEHOLDER, EMPTY_CONTRACT_NUMBER_PLACEHOLDER, EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER, HISTORICAL_CONTRACTOR_TAX_STATUS, type TechnicalSupervisionContractForm } from "@/lib/technical-supervision-contract";
 import { calculateSupervisionAmountKopecks, formatUahKopecks, supervisionAmountInWords } from "@/lib/technical-supervision-calculation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function TechnicalSupervisionContractStep({ form, estimateContext, isGene
   const rate = useWatch({ control: form.control, name: "calculationRatePercent" });
 
   const handleContractorProfileChange = (nextProfileId: TechnicalSupervisionContractForm["contractorProfileId"]) => {
-    const manualFields: Array<keyof TechnicalSupervisionContractForm> = ["contractorName", "contractorRegistrationDetails", "contractorDetails", "contractorSignatureTitle", "contractorSignature"];
+    const manualFields: Array<keyof TechnicalSupervisionContractForm> = ["contractorName", "contractorRegistrationDetails", "contractorAuthorizationBasis", "contractorCertificate", "contractorDetails", "contractorSignatureTitle", "contractorSignature", "contractorTaxStatus"];
     const hasManualChanges = manualFields.some((field) => Boolean(form.formState.dirtyFields[field]));
     if (hasManualChanges && !window.confirm("Заміна профілю перезапише вручну змінені реквізити виконавця. Продовжити?")) return;
 
@@ -40,9 +40,12 @@ export function TechnicalSupervisionContractStep({ form, estimateContext, isGene
     form.setValue("contractorProfileId", nextProfileId, { shouldDirty: false, shouldValidate: true });
     form.setValue("contractorName", profile.legalName, { shouldDirty: false, shouldValidate: true });
     form.setValue("contractorRegistrationDetails", `код ЄДРПОУ ${profile.identificationCode}`, { shouldDirty: false, shouldValidate: true });
+    form.setValue("contractorAuthorizationBasis", profile.authorizationBasis?.value ?? "", { shouldDirty: false, shouldValidate: true });
+    form.setValue("contractorCertificate", profile.certificate ?? "", { shouldDirty: false, shouldValidate: true });
     form.setValue("contractorDetails", formatPartyDetails(profile), { shouldDirty: false, shouldValidate: true });
     form.setValue("contractorSignatureTitle", profile.signaturePosition, { shouldDirty: false, shouldValidate: true });
     form.setValue("contractorSignature", profile.signatureName, { shouldDirty: false, shouldValidate: true });
+    form.setValue("contractorTaxStatus", profile.taxStatus?.trim() || HISTORICAL_CONTRACTOR_TAX_STATUS, { shouldDirty: false, shouldValidate: true });
   };
 
   useEffect(() => {
@@ -91,11 +94,11 @@ export function TechnicalSupervisionContractStep({ form, estimateContext, isGene
             </section>
 
             <section aria-labelledby="contract-details-heading">
-              <SectionHeading id="contract-details-heading" title="Реквізити договору" description="Номер і дата вводяться вручну. Кінцева дата та додаток запропоновані з історичного шаблону й залишаються редагованими." />
+              <SectionHeading id="contract-details-heading" title="Реквізити договору" description="Номер і дати є необов’язковими: їх можна вписати вручну після друку. Посилання на додаток заповнюється автоматично." />
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Номер договору" hint={manualHint(values.contractNumber)} error={form.formState.errors.contractNumber?.message}><Input {...form.register("contractNumber")} /></Field>
-                <Field label="Дата договору" hint={manualHint(values.documentDate)} error={form.formState.errors.documentDate?.message}><Input {...form.register("documentDate")} placeholder="____ __________ 2026" /></Field>
-                <Field label="Діє до" hint={historicalHint(values.contractEndDate, Boolean(form.formState.dirtyFields.contractEndDate))} error={form.formState.errors.contractEndDate?.message}><Input {...form.register("contractEndDate")} placeholder="31.12.2026" /></Field>
+                <Field label="Номер договору" hint={optionalManualHint(values.contractNumber)} error={form.formState.errors.contractNumber?.message}><Input {...form.register("contractNumber")} placeholder={EMPTY_CONTRACT_NUMBER_PLACEHOLDER} /></Field>
+                <Field label="Дата договору" hint={optionalManualHint(values.documentDate)} error={form.formState.errors.documentDate?.message}><Input {...form.register("documentDate")} placeholder="____ __________ 2026" /></Field>
+                <Field label="Діє до" hint={optionalManualHint(values.contractEndDate)} error={form.formState.errors.contractEndDate?.message}><Input {...form.register("contractEndDate")} placeholder={EMPTY_CONTRACT_END_DATE_PLACEHOLDER} /></Field>
                 <Field label="Посилання на додаток" hint={autoHint(values.appendixReference, Boolean(form.formState.dirtyFields.appendixReference))} error={form.formState.errors.appendixReference?.message}><Input {...form.register("appendixReference")} /></Field>
               </div>
             </section>
@@ -110,9 +113,10 @@ export function TechnicalSupervisionContractStep({ form, estimateContext, isGene
                 <Field label="Профіль виконавця" hint="Автозаповнено з профілю"><select value={values.contractorProfileId} onChange={(event) => handleContractorProfileChange(event.target.value as TechnicalSupervisionContractForm["contractorProfileId"])} className="h-11 w-full min-w-0 rounded-xl border bg-background px-3 text-sm font-normal outline-none" aria-label="Профіль виконавця">{contractorProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.displayName}</option>)}</select><p className="break-words text-xs font-normal leading-5 text-muted-foreground">{getContractorProfile(values.contractorProfileId).legalName}</p></Field>
                 <Field label="Назва виконавця" hint={profileHint(values.contractorName, Boolean(form.formState.dirtyFields.contractorName))} error={form.formState.errors.contractorName?.message}><Input {...form.register("contractorName")} /></Field>
                 <Field label="Реєстраційні дані виконавця" hint={profileHint(values.contractorRegistrationDetails, Boolean(form.formState.dirtyFields.contractorRegistrationDetails))} error={form.formState.errors.contractorRegistrationDetails?.message}><Textarea {...form.register("contractorRegistrationDetails")} className="min-h-24" /></Field>
-                <Field label="Кваліфікаційний сертифікат" hint={manualHint(values.contractorCertificate)} error={form.formState.errors.contractorCertificate?.message}><Input {...form.register("contractorCertificate")} /></Field>
-                <Field label="Податковий статус замовника" hint={manualHint(values.customerTaxStatus)} error={form.formState.errors.customerTaxStatus?.message}><Input {...form.register("customerTaxStatus")} placeholder="Потребує підтвердження" /></Field>
-                <Field label="Податковий статус виконавця" hint={manualHint(values.contractorTaxStatus)} error={form.formState.errors.contractorTaxStatus?.message}><Input {...form.register("contractorTaxStatus")} placeholder="Потребує підтвердження" /></Field>
+                <Field label="Підстава повноважень/реєстрації виконавця" hint={profileHint(values.contractorAuthorizationBasis, Boolean(form.formState.dirtyFields.contractorAuthorizationBasis))} error={form.formState.errors.contractorAuthorizationBasis?.message}><Textarea {...form.register("contractorAuthorizationBasis")} className="min-h-24" /></Field>
+                <Field label="Кваліфікаційний сертифікат" hint={contractorCertificateHint(values.contractorProfileId, Boolean(form.formState.dirtyFields.contractorCertificate))} error={form.formState.errors.contractorCertificate?.message}><Input {...form.register("contractorCertificate")} /></Field>
+                <Field label="Податковий статус замовника" hint={historicalTemplateHint(values.customerTaxStatus, Boolean(form.formState.dirtyFields.customerTaxStatus))} error={form.formState.errors.customerTaxStatus?.message}><Input {...form.register("customerTaxStatus")} /></Field>
+                <Field label="Податковий статус виконавця" hint={historicalTemplateHint(values.contractorTaxStatus, Boolean(form.formState.dirtyFields.contractorTaxStatus))} error={form.formState.errors.contractorTaxStatus?.message}><Input {...form.register("contractorTaxStatus")} /></Field>
                 <Field label="Реквізити замовника" hint={profileHint(values.customerDetails, Boolean(form.formState.dirtyFields.customerDetails))} error={form.formState.errors.customerDetails?.message}><Textarea {...form.register("customerDetails")} className="min-h-32 break-words" placeholder="Адреса, рахунок, код, банк, контакти" /></Field>
                 <Field label="Підпис замовника" hint={profileHint(values.customerSignature, Boolean(form.formState.dirtyFields.customerSignature))} error={form.formState.errors.customerSignature?.message}><Input {...form.register("customerSignature")} /></Field>
                 <Field label="Посада замовника" hint={profileHint(values.customerSignatureTitle, Boolean(form.formState.dirtyFields.customerSignatureTitle))} error={form.formState.errors.customerSignatureTitle?.message}><Input {...form.register("customerSignatureTitle")} /></Field>
@@ -140,8 +144,8 @@ function ContractReviewWarning({ context }: { context: EstimateContext | null })
 }
 
 function ContractPreview({ values }: { values: Record<string, string> | null }) {
-  const intro = `${previewValue(values, "customerName", "Замовник")} (далі - Замовник) в особі ${previewValue(values, "customerRepresentative", "представника замовника")}, що діє на підставі ${previewValue(values, "customerLegalBasis", "підстави повноважень")}, з однієї сторони, та ${previewValue(values, "contractorName", "Виконавець")}, що діє на підставі ${previewValue(values, "contractorRegistrationDetails", "реєстраційних даних")} та ${previewValue(values, "contractorCertificate", "кваліфікаційного сертифіката")}, з другої сторони, разом іменовані «Сторони», уклали цей Договір на виконання технічного нагляду (надалі – Договір) про нижчезазначене:`;
-  return <aside className="lg:sticky lg:top-6" aria-label="Живий перегляд договору технічного нагляду"><div className="mb-3 flex items-center justify-between px-1"><div><p className="text-sm font-semibold">Живий перегляд</p><p className="mt-1 text-xs text-muted-foreground">Повний текст 12 розділів договору</p></div><Badge className="bg-accent text-primary-hover">DOCX</Badge></div><div className="rounded-[26px] border bg-background p-3 shadow-sm sm:p-5"><div className="mx-auto max-h-[min(78vh,1080px)] max-w-[560px] overflow-y-auto bg-white px-5 py-8 text-[10px] leading-[1.42] text-[#202020] shadow-sm sm:px-8 sm:py-10" aria-label="Попередній перегляд договору"><h3 className="text-center text-[14px] font-bold tracking-[0.18em]">Д О Г О В І Р № {previewValue(values, "contractNumber", "________")}</h3><p className="text-center text-[12px] font-semibold">на виконання технічного нагляду</p><p className="mt-8 flex justify-between gap-4"><span>м. Луцьк</span><span className="text-right">«{previewValue(values, "documentDate", "____ __________ 2026")}»</span></p><p className="mt-8 text-justify">{intro}</p><div className="mt-8 space-y-5">{contractPreviewSections.map((section) => <section key={section.heading} aria-labelledby={`preview-${section.heading.slice(0, 2)}`}><h4 id={`preview-${section.heading.slice(0, 2)}`} className="text-center text-[11px] font-bold">{section.heading}</h4><div className="mt-2 space-y-2">{section.paragraphs.map((paragraph, index) => <p key={`${section.heading}-${index}`} className="whitespace-pre-line break-words text-justify">{resolvePreviewText(paragraph, values)}</p>)}</div></section>)}</div><section className="mt-6" aria-labelledby="preview-signatures"><h4 id="preview-signatures" className="text-center text-[11px] font-bold">12. Юридичні адреси, банківські реквізити і підписи Сторін.</h4><div className="mt-3 grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2"><div className="min-w-0"><p className="font-bold">ЗАМОВНИК</p><p className="mt-2 whitespace-pre-line break-words">{previewValue(values, "customerDetails", "Реквізити замовника")}</p><p className="mt-5 break-words">{previewValue(values, "customerSignatureTitle", "Посада")}</p><p className="mt-4 break-words">________________ {values?.customerSignature || ""}</p><p>М.П.</p></div><div className="min-w-0"><p className="font-bold">ВИКОНАВЕЦЬ</p><p className="mt-2 whitespace-pre-line break-words">{previewValue(values, "contractorDetails", "Реквізити виконавця")}</p><p className="mt-5 break-words">{previewValue(values, "contractorSignatureTitle", "Посада")}</p><p className="mt-4 break-words">________________ {values?.contractorSignature || ""}</p><p>М.П.</p></div></div></section></div></div><p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Попередній перегляд містить повний стандартний текст. Точна пагінація та Word-верстка формуються затвердженим DOCX-шаблоном.</p></aside>;
+  const intro = `${previewValue(values, "customerName", "Замовник")} (далі - Замовник) в особі ${previewValue(values, "customerRepresentative", "представника замовника")}, що діє на підставі ${previewValue(values, "customerLegalBasis", "підстави повноважень")}, з однієї сторони, та ${previewValue(values, "contractorName", "Виконавець")}, що діє на підставі ${previewValue(values, "contractorAuthorizationBasis", "підстави повноважень виконавця")}${previewValue(values, "contractorCertificateClause", "")}, з другої сторони, разом іменовані «Сторони», уклали цей Договір на виконання технічного нагляду (надалі – Договір) про нижчезазначене:`;
+  return <aside className="lg:sticky lg:top-6" aria-label="Живий перегляд договору технічного нагляду"><div className="mb-3 flex items-center justify-between px-1"><div><p className="text-sm font-semibold">Живий перегляд</p><p className="mt-1 text-xs text-muted-foreground">Повний текст 12 розділів договору</p></div><Badge className="bg-accent text-primary-hover">DOCX</Badge></div><div className="rounded-[26px] border bg-background p-3 shadow-sm sm:p-5"><div className="mx-auto max-h-[min(78vh,1080px)] max-w-[560px] overflow-y-auto bg-white px-5 py-8 text-[10px] leading-[1.42] text-[#202020] shadow-sm sm:px-8 sm:py-10" aria-label="Попередній перегляд договору"><h3 className="text-center text-[14px] font-bold tracking-[0.18em]">Д О Г О В І Р № {previewValue(values, "contractNumber", "________")}</h3><p className="text-center text-[12px] font-semibold">на виконання технічного нагляду</p><p className="mt-8 flex justify-between gap-4"><span>м. Луцьк</span><span className="text-right">{previewValue(values, "documentDate", EMPTY_CONTRACT_SIGNING_DATE_PLACEHOLDER)}</span></p><p className="mt-8 text-justify">{intro}</p><div className="mt-8 space-y-5">{contractPreviewSections.map((section) => <section key={section.heading} aria-labelledby={`preview-${section.heading.slice(0, 2)}`}><h4 id={`preview-${section.heading.slice(0, 2)}`} className="text-center text-[11px] font-bold">{section.heading}</h4><div className="mt-2 space-y-2">{section.paragraphs.map((paragraph, index) => <p key={`${section.heading}-${index}`} className="whitespace-pre-line break-words text-justify">{resolvePreviewText(paragraph, values)}</p>)}</div></section>)}</div><section className="mt-6" aria-labelledby="preview-signatures"><h4 id="preview-signatures" className="text-center text-[11px] font-bold">12. Юридичні адреси, банківські реквізити і підписи Сторін.</h4><div className="mt-3 grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2"><div className="min-w-0"><p className="font-bold">ЗАМОВНИК</p><p className="mt-2 whitespace-pre-line break-words">{previewValue(values, "customerDetails", "Реквізити замовника")}</p><p className="mt-5 break-words">{previewValue(values, "customerSignatureTitle", "Посада")}</p><p className="mt-4 break-words">________________ {values?.customerSignature || ""}</p><p>М.П.</p></div><div className="min-w-0"><p className="font-bold">ВИКОНАВЕЦЬ</p><p className="mt-2 whitespace-pre-line break-words">{previewValue(values, "contractorDetails", "Реквізити виконавця")}</p><p className="mt-5 break-words">{previewValue(values, "contractorSignatureTitle", "Посада")}</p><p className="mt-4 break-words">________________ {values?.contractorSignature || ""}</p><p>М.П.</p></div></div></section></div></div><p className="mt-3 px-1 text-xs leading-5 text-muted-foreground">Попередній перегляд містить повний стандартний текст. Точна пагінація та Word-верстка формуються затвердженим DOCX-шаблоном.</p></aside>;
 }
 
 function previewValue(values: Record<string, string> | null, key: string, fallback: string): string {
@@ -170,14 +174,30 @@ function manualHint(value: string): string {
   return value.trim() ? "Змінено вручну" : "Потрібно ввести вручну";
 }
 
+function optionalManualHint(value: string): string {
+  return value.trim() ? "Змінено вручну" : "Не заповнено — можна вписати вручну";
+}
+
 function profileHint(value: string, edited: boolean): string {
   if (edited) return "Змінено вручну";
   return value.trim() ? "Автозаповнено з профілю" : "Потрібно ввести вручну";
 }
 
+function contractorCertificateHint(profileId: TechnicalSupervisionContractForm["contractorProfileId"], edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  const profile = getContractorProfile(profileId);
+  if (profile.certificate) return "Автозаповнено з профілю";
+  return profile.legalType === "ТОВ" ? "Необов'язкове поле" : "Не знайдено у джерелі";
+}
+
 function historicalHint(value: string, edited: boolean): string {
   if (edited) return "Змінено вручну";
   return value.trim() ? "Історичне посилання — перевірте" : "Потрібно ввести вручну";
+}
+
+function historicalTemplateHint(value: string, edited: boolean): string {
+  if (edited) return "Змінено вручну";
+  return value.trim() ? "Історичний шаблон — перевірте" : "Потрібно ввести вручну";
 }
 
 function autoHint(value: string, edited: boolean): string {
@@ -188,7 +208,7 @@ function autoHint(value: string, edited: boolean): string {
 function hintClass(hint: string): string {
   const layout = "inline-flex max-w-full shrink-0 whitespace-normal break-words rounded-full px-2 py-0.5 text-[10px] leading-4";
   if (/не знайдено|потрібно ввести/i.test(hint)) return `${layout} bg-danger-soft font-semibold text-danger`;
-  if (/змінено|історичне/i.test(hint)) return `${layout} bg-cream font-semibold text-primary-hover`;
+  if (/змінено|історичн/i.test(hint)) return `${layout} bg-cream font-semibold text-primary-hover`;
   return `${layout} bg-accent font-medium text-primary-hover`;
 }
 

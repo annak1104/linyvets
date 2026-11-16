@@ -71,8 +71,8 @@ def create_template(source: Path, destination: Path) -> None:
         if len(paragraphs) != 16 or len(tables) != 2:
             raise RuntimeError(f"Unexpected source structure: {len(paragraphs)} body paragraphs, {len(tables)} tables.")
 
-        replace_paragraph_text(paragraphs[3], 'від  «{{documentDate}}» року')
-        replace_paragraph_text(paragraphs[4], "№{{contractNumber}}")
+        replace_paragraph_text(paragraphs[3], 'від  {{documentDate}}')
+        replace_paragraph_text(paragraphs[4], "№ {{contractNumber}}")
         replace_paragraph_text(paragraphs[12], "Всього: {{supervisionAmountUah}} грн ({{supervisionAmountInWords}}) без ПДВ")
 
         calculation_table = tables[0]

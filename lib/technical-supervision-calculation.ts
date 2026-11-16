@@ -26,6 +26,7 @@ const decimalText = z.string().trim().min(1, "Вкажіть значення").
 }, "Введіть коректне невід’ємне число");
 
 const requiredText = z.string().trim().min(1, "Підтвердіть це поле");
+const optionalText = z.string().trim();
 export const technicalSupervisionCalculationSchema = z.object({
   projectName: requiredText.min(2, "Додайте назву об’єкта"),
   customerProfileId: customerProfileIdSchema,
@@ -35,8 +36,8 @@ export const technicalSupervisionCalculationSchema = z.object({
   calculationRatePercent: decimalText,
   supervisionAmountUah: z.string(),
   supervisionAmountInWords: z.string(),
-  contractNumber: requiredText,
-  documentDate: requiredText,
+  contractNumber: optionalText,
+  documentDate: optionalText,
   customerDetails: requiredText,
   customerDirector: requiredText,
   contractorDetails: requiredText,
@@ -148,8 +149,8 @@ export function buildTechnicalSupervisionCalculationTemplateValues(data: Technic
     supervisionAmountUah: formatUahKopecks(amountKopecks),
     supervisionAmountInWords: supervisionAmountInWords(amountKopecks),
     chapters1To9Expression: `${chaptersTotalUah} х ${normalizedRateText(data.calculationRatePercent)}%`,
-    contractNumber: data.contractNumber,
-    documentDate: data.documentDate,
+    contractNumber: data.contractNumber || "__________",
+    documentDate: data.documentDate ? `«${data.documentDate}» року` : "«____» __________ 2026 року",
     customerDetails: data.customerDetails,
     customerDirector: data.customerDirector,
     contractorDetails: data.contractorDetails,

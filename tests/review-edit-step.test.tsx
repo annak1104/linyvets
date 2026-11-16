@@ -153,12 +153,13 @@ describe("ReviewEditStep", () => {
 
     await waitFor(() => {
       expect((screen.getByLabelText("Абзац 3 · організація") as HTMLTextAreaElement).value).toBe("Проєктна організація: ФОП Шевчук І.В.");
-      expect((screen.getByLabelText("Абзац 4 · інженер") as HTMLTextAreaElement).value).toBe("Головний інженер проєкту: Шевчук І.В.");
+      expect((screen.getByLabelText("Абзац 4 · інженер") as HTMLTextAreaElement).value).toBe("Головний інженер проєкту: Шевчук І.В. (сертифікат АТ № 007622)");
+      expect((screen.getByLabelText(/Сертифікат/) as HTMLInputElement).value).toBe("АТ № 007622");
     });
 
     const preview = screen.getByLabelText("Попередній перегляд документа");
     expect(preview.textContent).toContain("Проєктна організація: ФОП Шевчук І.В.");
-    expect(preview.textContent).toContain("Головний інженер проєкту: Шевчук І.В.");
+    expect(preview.textContent).toContain("Головний інженер проєкту: Шевчук І.В. (сертифікат АТ № 007622)");
 
     fireEvent.change(screen.getByLabelText("Абзац 3 · організація"), { target: { value: "Власний абзац організації" } });
     fireEvent.change(screen.getByLabelText("Абзац 4 · інженер"), { target: { value: "Власний абзац інженера" } });
@@ -168,6 +169,19 @@ describe("ReviewEditStep", () => {
       expect(screen.getByDisplayValue("Власний абзац інженера")).toBeTruthy();
       expect(preview.textContent).toContain("Власний абзац організації");
       expect(preview.textContent).toContain("Власний абзац інженера");
+    });
+  });
+
+  it("preserves a manually edited certificate after source synchronization", async () => {
+    render(<ReviewHarness mappedSource />);
+
+    await waitFor(() => expect((screen.getByLabelText(/Сертифікат/) as HTMLInputElement).value).toBe("АТ № 007622"));
+    fireEvent.change(screen.getByLabelText(/Сертифікат/), { target: { value: "АТ № ручний" } });
+
+    await waitFor(() => {
+      expect((screen.getByLabelText(/Сертифікат/) as HTMLInputElement).value).toBe("АТ № ручний");
+      expect(screen.getByText("Змінено вручну")).toBeTruthy();
+      expect(screen.getByLabelText("Абзац 4 · інженер")).toHaveProperty("value", "Головний інженер проєкту: Шевчук І.В. (сертифікат АТ № ручний)");
     });
   });
 });

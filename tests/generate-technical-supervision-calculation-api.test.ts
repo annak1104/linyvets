@@ -22,6 +22,22 @@ function digest(buffer: Buffer): string {
 }
 
 describe("POST /api/generate-technical-supervision-calculation", () => {
+  it("accepts empty shared contract details and keeps printable placeholders", async () => {
+    const context = createEstimateContext(await parseAvk5Estimate(source), "67_КД_ЗКР.rtf");
+    const values = {
+      ...buildTechnicalSupervisionCalculationDefaults(context),
+      customerDirector: "Директор",
+      contractorSignatureTitle: "Підписант виконавця",
+      contractorSignature: "ПІБ виконавця",
+    };
+    const response = await POST(new Request("http://localhost/api/generate-technical-supervision-calculation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }));
+    const xml = packagePart(Buffer.from(await response.arrayBuffer()), "word/document.xml").toString("utf8");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("№ __________");
+    expect(xml).toContain("«____» __________ 2026 року");
+  });
+
   it("generates the verified reference calculation with edited party details", async () => {
     const parsed = await parseAvk5Estimate(source);
     const context = createEstimateContext(parsed, "67_КД_ЗКР.rtf");
