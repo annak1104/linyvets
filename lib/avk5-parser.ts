@@ -133,6 +133,8 @@ const RTF_HEADER = /^\s*\{\\rtf\d/;
 const PROJECT_NAME_SECTION = "ЗВЕДЕНИЙ КОШТОРИСНИЙ РОЗРАХУНОК ВАРТОСТІ";
 const APPROVAL_SUMMARY_LABEL = "Зведений кошторисний розрахунок в сумі";
 const ESTIMATE_TOTAL_LABEL = "Всього по зведеному кошторисному розрахунку";
+const THOUSANDS_AMOUNT_PATTERN = String.raw`\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,3})?`;
+const TABLE_AMOUNT_PATTERN = String.raw`\d{1,3}(?:\.\d{3})*(?:,\d{1,3})?`;
 
 /**
  * Parse an AVK-5 estimate from its original RTF bytes.
@@ -308,7 +310,10 @@ function extractAvk5Data(
   }
 
   const itemsTotalThousandsUah = sumItemTotals(items);
-  const totalCandidates = [summaryMatch?.value, estimateTableMatch?.value, explanatoryMatch?.value, finalTotalMatch?.value].filter((value): value is number => value !== undefined && value !== null);
+  const totalCandidates = (documentType === "consolidated-estimate"
+    ? [summaryMatch?.value, estimateTableMatch?.value, explanatoryMatch?.value]
+    : [estimateTableMatch?.value, finalTotalMatch?.value]
+  ).filter((value): value is number => value !== undefined && value !== null);
   const uniqueTotals = [...new Set(totalCandidates)];
   const verificationStatus: Avk5TotalsVerification["status"] = uniqueTotals.length === 0
     ? "unavailable"
@@ -786,10 +791,14 @@ function joinProjectNameParts(parts: string[]): string {
 }
 
 function findApprovalSummaryTotal(paragraphs: string[]) {
-  const index = paragraphs.findIndex((text) => text.includes("Затверджено (схвалено)") && text.includes(APPROVAL_SUMMARY_LABEL));
+  const pattern = new RegExp(
+    `Затверджено\\s*\\(схвалено\\)[\\s\\S]*?${escapeRegExp(APPROVAL_SUMMARY_LABEL)}\\s*:?\\s*(${THOUSANDS_AMOUNT_PATTERN})\\s*тис\\.?\\s*грн\\.?`,
+    "i",
+  );
+  const index = paragraphs.findIndex((text) => pattern.test(text));
   if (index === -1) return undefined;
   const text = paragraphs[index];
-  const match = text.match(new RegExp(`${escapeRegExp(APPROVAL_SUMMARY_LABEL)}\\s+([0-9][0-9 .]*[.,][0-9]{3})\\s+тис\\.\\s*грн`, "i"));
+  const match = text.match(pattern);
   if (!match) return undefined;
   return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, index, match[0]) };
 }
@@ -798,7 +807,13 @@ function findEstimateTableTotal(paragraphs: string[]) {
   const consolidatedIndex = paragraphs.findIndex((text) => text.includes(ESTIMATE_TOTAL_LABEL));
   if (consolidatedIndex >= 0) {
     const text = paragraphs[consolidatedIndex];
-    const match = text.match(/(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})$/);
+    const labelIndex = text.indexOf(ESTIMATE_TOTAL_LABEL);
+    const rowText = text.slice(labelIndex + ESTIMATE_TOTAL_LABEL.length);
+    const matches = [...rowText.matchAll(new RegExp(
+      `(${TABLE_AMOUNT_PATTERN})(?=\\s*(?:тис\\.?\\s*грн\\.?|грн\\.?|$))`,
+      "gi",
+    ))];
+    const match = matches.at(-1);
     if (match) return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, consolidatedIndex, match[0]) };
   }
 
@@ -812,12 +827,40 @@ function findEstimateTableTotal(paragraphs: string[]) {
 }
 
 function findExplanatoryTotal(paragraphs: string[]) {
-  const index = paragraphs.findIndex((text) => /у тому числ[іi]:/i.test(text) && /податок на додану варт[іi]сть/i.test(text));
-  if (index === -1) return undefined;
-  const text = paragraphs[index];
-  const match = text.match(/у тому числ[іi]:\s*(\d{1,3}(?:[ .]\d{3})*[.,]\d{3})\s*тис\./i);
-  if (!match) return undefined;
-  return { value: parseThousandsUah(match[1]), sourceText: match[1], evidence: makeEvidence(paragraphs, index, match[0]) };
+  const totalLabel = /всього\s+за\s+зведеним\s+кошторисним\s+розрахунком|загальна\s+кошторисна\s+вартість/i;
+  const amountPattern = new RegExp(`(${THOUSANDS_AMOUNT_PATTERN})\\s*тис\\.?\\s*грн\\.?`, "gi");
+
+  for (const [index, text] of paragraphs.entries()) {
+    if (!/податок на додану варт[іi]сть/i.test(text)) continue;
+    const labelParagraphIndex = [index, index - 1, index - 2]
+      .find((candidateIndex) => candidateIndex >= 0 && totalLabel.test(paragraphs[candidateIndex]));
+    if (labelParagraphIndex === undefined) continue;
+
+    const labelMatch = paragraphs[labelParagraphIndex].match(totalLabel);
+    if (!labelMatch || labelMatch.index === undefined) continue;
+
+    const afterLabel = labelParagraphIndex === index
+      ? text.slice(labelMatch.index + labelMatch[0].length)
+      : text;
+    const markerMatch = afterLabel.match(/у тому числ[іi]\s*:/i);
+    const beforeMarker = markerMatch?.index === undefined ? afterLabel : afterLabel.slice(0, markerMatch.index);
+    const beforeMarkerMatches = [...beforeMarker.matchAll(amountPattern)];
+    const beforeMarkerMatch = beforeMarkerMatches.at(-1);
+    if (beforeMarkerMatch) {
+      return { value: parseThousandsUah(beforeMarkerMatch[1]), sourceText: beforeMarkerMatch[1], evidence: makeEvidence(paragraphs, index, beforeMarkerMatch[0]) };
+    }
+
+    // Some AVK exports put the authoritative total directly after the
+    // explanatory label and marker. Do not inspect component rows after it.
+    if (markerMatch?.index !== undefined) {
+      const afterMarker = afterLabel.slice(markerMatch.index + markerMatch[0].length);
+      const directMatch = afterMarker.match(new RegExp(`^\\s*(${THOUSANDS_AMOUNT_PATTERN})\\s*тис\\.?\\s*грн\\.?`, "i"));
+      if (directMatch) {
+        return { value: parseThousandsUah(directMatch[1]), sourceText: directMatch[1], evidence: makeEvidence(paragraphs, index, directMatch[0]) };
+      }
+    }
+  }
+  return undefined;
 }
 
 function findChapters1To9Total(paragraphs: string[]) {
@@ -891,7 +934,12 @@ function makeEvidence(paragraphs: string[], paragraphIndex: number, matchedText?
 }
 
 function flattenParagraph(paragraph: RtfParagraph): string {
-  return (paragraph.content ?? []).map((span) => span.value ?? "").join("");
+  return (paragraph.content ?? []).reduce((result, span, index, content) => {
+    const value = span.value ?? "";
+    const previousValue = content[index - 1]?.value ?? "";
+    const cellBoundary = /\d$/.test(previousValue) && /^\d/.test(value) ? " " : "";
+    return `${result}${cellBoundary}${value}`;
+  }, "");
 }
 
 function collapseWhitespace(value: string): string {

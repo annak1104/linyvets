@@ -5,7 +5,7 @@ import { buildOrderParagraphs, officialOrderCertificateValue } from "@/lib/order
 const baseValues = {
   projectName: "Тестовий проєкт",
   estimatedAmountThousandsUah: "1",
-  estimatedAmountInWords: "Одна тисяча грн 00 коп.",
+  estimatedAmountInWords: "Одна тисяча гривень 00 копійок",
   projectOrganization: "Ігор ШЕВЧУК",
   chiefProjectEngineer: "Ігор ШЕВЧУК",
   certificate: "",

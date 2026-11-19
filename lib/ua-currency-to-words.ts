@@ -6,6 +6,8 @@ const TWO = BigInt(2);
 const HUNDRED = BigInt(100);
 const THOUSAND = BigInt(1000);
 const HUNDRED_THOUSAND = BigInt(100_000);
+const HRYVNIA_FORMS: [string, string, string] = ["гривня", "гривні", "гривень"];
+const KOPECK_FORMS: [string, string, string] = ["копійка", "копійки", "копійок"];
 
 const ONES_MASCULINE = [
   "нуль",
@@ -13,11 +15,11 @@ const ONES_MASCULINE = [
   "два",
   "три",
   "чотири",
-  "п’ять",
+  "п'ять",
   "шість",
   "сім",
   "вісім",
-  "дев’ять",
+  "дев'ять",
 ];
 
 const ONES_FEMININE = [
@@ -26,11 +28,11 @@ const ONES_FEMININE = [
   "дві",
   "три",
   "чотири",
-  "п’ять",
+  "п'ять",
   "шість",
   "сім",
   "вісім",
-  "дев’ять",
+  "дев'ять",
 ];
 
 const TEENS = [
@@ -39,11 +41,11 @@ const TEENS = [
   "дванадцять",
   "тринадцять",
   "чотирнадцять",
-  "п’ятнадцять",
+  "п'ятнадцять",
   "шістнадцять",
   "сімнадцять",
   "вісімнадцять",
-  "дев’ятнадцять",
+  "дев'ятнадцять",
 ];
 
 const TENS = [
@@ -52,11 +54,11 @@ const TENS = [
   "двадцять",
   "тридцять",
   "сорок",
-  "п’ятдесят",
+  "п'ятдесят",
   "шістдесят",
   "сімдесят",
   "вісімдесят",
-  "дев’яносто",
+  "дев'яносто",
 ];
 
 const HUNDREDS = [
@@ -65,11 +67,11 @@ const HUNDREDS = [
   "двісті",
   "триста",
   "чотириста",
-  "п’ятсот",
+  "п'ятсот",
   "шістсот",
   "сімсот",
   "вісімсот",
-  "дев’ятсот",
+  "дев'ятсот",
 ];
 
 function inputToText(value: DecimalInput): string {
@@ -139,10 +141,11 @@ function underThousandToWords(value: number, feminine: boolean): string {
   return words.join(" ");
 }
 
-function pluralForm(value: number, forms: [string, string, string]): string {
-  const lastTwo = value % 100;
+function pluralForm(value: number | bigint, forms: [string, string, string]): string {
+  const lastTwo = typeof value === "bigint" ? Number(value % BigInt(100)) : value % 100;
   if (lastTwo >= 11 && lastTwo <= 14) return forms[2];
-  switch (value % 10) {
+  const last = typeof value === "bigint" ? Number(value % BigInt(10)) : value % 10;
+  switch (last) {
     case 1:
       return forms[0];
     case 2:
@@ -191,12 +194,12 @@ function capitalize(value: string): string {
 
 /**
  * Converts thousands of UAH to the wording used in the source order.
- * Example: `197,271` -> `Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.`
+ * Example: `197,271` -> `Сто дев'яносто сім тисяч двісті сімдесят одна гривня 00 копійок`
  */
 export function amountInWordsUkrainian(value: DecimalInput): string {
   const kopecks = parseThousandsUahToKopecks(value);
   const hryvnias = kopecks / HUNDRED;
   const minor = kopecks % HUNDRED;
   const kopecksText = minor.toString().padStart(2, "0");
-  return `${capitalize(hryvniaIntegerToWords(hryvnias))} грн ${kopecksText} коп.`;
+  return `${capitalize(hryvniaIntegerToWords(hryvnias))} ${pluralForm(hryvnias, HRYVNIA_FORMS)} ${kopecksText} ${pluralForm(minor, KOPECK_FORMS)}`;
 }

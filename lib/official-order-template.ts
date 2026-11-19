@@ -69,8 +69,9 @@ export function buildOfficialOrderTemplateValues(data: OfficialOrderTemplateData
   const signatory = getCustomerSignatory(data.customerSignatoryId ?? defaultCustomerSignatoryId);
   const amount = data.estimatedAmountThousandsUah;
   const estimatedAmount = amount === undefined ? "" : formatThousandsUah(amount);
-  const estimatedAmountInWords =
-    data.estimatedAmountInWords ?? (amount === undefined ? "" : amountInWordsUkrainian(amount));
+  const estimatedAmountInWords = amount === undefined
+    ? data.estimatedAmountInWords ?? ""
+    : amountInWordsUkrainian(amount);
 
   return {
     customerSignatureTitle: data.customerSignatureTitle ?? signatory.position,

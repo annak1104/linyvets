@@ -22,7 +22,7 @@ const editedOrder: OrderForm = {
   chiefProjectEngineer: "Ігор ШЕВЧУК",
   certificate: "серії АР № 999999",
   estimatedAmountThousandsUah: "197,271",
-  estimatedAmountInWords: "Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.",
+  estimatedAmountInWords: "Сто дев'яносто сім тисяч двісті сімдесят одна гривня 00 копійок",
   orderParagraph1: "Затвердити зведений кошторис\nвартості робіт:",
   orderParagraph2: "Новий проєкт / об’єкт: 2026\nдодатковий рядок абзацу в наказі;",
   orderParagraph3: "Проєктна організація: ТОВ «Нова організація»",
@@ -82,7 +82,7 @@ describe("POST /api/generate-order", () => {
     expect(response.status).toBe(200);
     expect(xml).toContain("Поточний ремонт вулиці Ветеранів в місті Луцьку Волинської області");
     expect(xml).toContain("144,079");
-    expect(xml).toContain("Сто сорок чотири тисячі сімдесят дев’ять грн 00 коп.");
+    expect(xml).toContain("Сто сорок чотири тисячі сімдесят дев&apos;ять гривень 00 копійок");
     expect(xml).not.toContain("Кравчука");
     expect(xml).not.toContain("{{");
   });
@@ -110,7 +110,7 @@ describe("POST /api/generate-order", () => {
     expect(xml).toContain("Ігор ШЕВЧУК");
     expect(xml).toContain("серії АР № 999999");
     expect(xml).toContain("197,271");
-    expect(xml).toContain("Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.");
+    expect(xml).toContain("Сто дев&apos;яносто сім тисяч двісті сімдесят одна гривня 00 копійок");
     expect(xml).toContain("<w:br");
     expect(xml).not.toContain("Кравчука");
     expect(xml).not.toContain("Волинської області");
@@ -125,6 +125,27 @@ describe("POST /api/generate-order", () => {
     expect(sha256(packagePart(document, "word/embeddings/oleObject1.bin"))).toBe(
       sha256(packagePart(source, "word/embeddings/oleObject1.bin")),
     );
+  });
+
+  it("derives the DOCX numeric and written amounts from the same decimal input", async () => {
+    const amount = "36,923";
+    const response = await POST(new Request("http://localhost/api/generate-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...editedOrder,
+        projectName: "Тестовий проєкт",
+        estimatedAmountThousandsUah: amount,
+        estimatedAmountInWords: "Застаріле значення",
+        orderParagraph2: "",
+      }),
+    }));
+    const xml = packagePart(Buffer.from(await response.arrayBuffer()), "word/document.xml").toString("utf8");
+
+    expect(response.status).toBe(200);
+    expect(xml).toContain("36,923");
+    expect(xml).toContain("Тридцять шість тисяч дев&apos;ятсот двадцять три гривні 00 копійок");
+    expect(xml).not.toContain("Застаріле значення");
   });
 
   it("rejects invalid final form data without attempting generation", async () => {

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { officialOrderPersonCertificate, officialOrderPersonProfileId, officialOrderPersonValue } from "@/lib/official-order-person-mapping";
 import { customerSignatoryIdSchema, defaultCustomerSignatoryId, getCustomerSignatory } from "@/lib/party-profiles";
-import { parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
+import { amountInWordsUkrainian, formatThousandsUah, parseThousandsUahToKopecks } from "@/lib/ua-currency-to-words";
 
 export const DEFAULT_ORDER_PARAGRAPH = "Затвердити зведений кошторис вартості робіт (робочий проєкт):";
 
@@ -88,8 +88,22 @@ export function buildOrderParagraphs(
   values: Pick<OrderForm, "projectName" | "estimatedAmountThousandsUah" | "estimatedAmountInWords" | "projectOrganization" | "chiefProjectEngineer" | "certificate">,
   sourcePeople?: OrderSourcePeople,
 ): OrderParagraphValues {
-  const projectParagraph = values.projectName && values.estimatedAmountThousandsUah && values.estimatedAmountInWords
-    ? `${values.projectName} в сумі ${values.estimatedAmountThousandsUah} тис. грн. (${values.estimatedAmountInWords});`
+  let amount = "";
+  let amountInWords = "";
+  if (values.estimatedAmountThousandsUah.trim()) {
+    try {
+      amount = formatThousandsUah(values.estimatedAmountThousandsUah);
+      amountInWords = amountInWordsUkrainian(amount);
+    } catch {
+      // Keep the editable paragraph stable while the user is entering an
+      // incomplete value; schema validation still rejects it on submit.
+      amount = values.estimatedAmountThousandsUah;
+      amountInWords = values.estimatedAmountInWords;
+    }
+  }
+
+  const projectParagraph = values.projectName && amount && amountInWords
+    ? `${values.projectName} в сумі ${amount} тис. грн. (${amountInWords});`
     : "";
   const organizationName = mappedRoleValue(values.projectOrganization, sourcePeople?.projectOrganizationHead, "projectOrganizationHead");
   const organizationParagraph = `Проєктна організація: ${organizationName}`;

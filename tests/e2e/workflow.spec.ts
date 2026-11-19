@@ -51,7 +51,7 @@ test.describe("Лінивець complete workflow", () => {
     const projectName = "Поточний ремонт — оновлений об’єкт із дуже довгою назвою 2026";
     await page.getByLabel("Назва проєкту").fill(projectName);
     await page.getByLabel("Сума, тис. грн").fill("12345,678");
-    await expect(page.getByLabel("Сума українською")).toHaveValue("Дванадцять мільйонів триста сорок п’ять тисяч шістсот сімдесят вісім грн 00 коп.");
+    await expect(page.getByLabel("Сума українською")).toHaveValue("Дванадцять мільйонів триста сорок п'ять тисяч шістсот сімдесят вісім гривень 00 копійок");
     await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText(projectName);
     await expect(page.locator('[aria-label="Попередній перегляд документа"]')).toContainText("12345,678");
     await page.screenshot({ path: saveScreenshotPath(`03-review-edited-${testInfo.project.name}.png`), fullPage: true });
@@ -65,7 +65,7 @@ test.describe("Лінивець complete workflow", () => {
     const xml = documentXml(readFileSync(downloadedPath!));
     expect(xml).toContain(projectName);
     expect(xml).toContain("12345,678");
-    expect(xml).toContain("Дванадцять мільйонів триста сорок п’ять тисяч шістсот сімдесят вісім грн 00 коп.");
+    expect(xml).toContain("Дванадцять мільйонів триста сорок п'ять тисяч шістсот сімдесят вісім гривень 00 копійок");
     expect(xml).toContain("Організаційний абзац, відредагований вручну");
     expect(xml).toContain("Інженерний абзац, відредагований вручну");
     expect(xml).not.toContain("{{");

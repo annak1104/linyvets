@@ -78,7 +78,7 @@ describe("POST /api/generate-technical-supervision-contract", () => {
     expect(xml).toContain("1,1%");
     expect(xml).toContain("177 135,00");
     expect(xml).toContain("1 948,49");
-    expect(xml).toContain("Одна тисяча дев’ятсот сорок вісім грн 49 коп.");
+    expect(xml).toContain("Одна тисяча дев&apos;ятсот сорок вісім гривень 49 копійок");
     expect(xml).toContain("Підтверджений замовник");
     expect(xml).toContain("Підтверджений виконавець");
     expect(xml).not.toContain("{{");

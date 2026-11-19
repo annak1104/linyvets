@@ -20,7 +20,7 @@ describe("technical supervision calculation", () => {
     const amount = calculateSupervisionAmountKopecks("177 135,00", "1,1");
 
     expect(formatUahKopecks(amount)).toBe("1 948,49");
-    expect(supervisionAmountInWords(amount)).toBe("Одна тисяча дев’ятсот сорок вісім грн 49 коп.");
+    expect(supervisionAmountInWords(amount)).toBe("Одна тисяча дев'ятсот сорок вісім гривень 49 копійок");
   });
 
   it("maps the real 67 AVK-5 estimate without using its 1.5% allowance as the calculation rate", async () => {
@@ -83,7 +83,7 @@ describe("technical supervision calculation", () => {
     const values = buildTechnicalSupervisionCalculationTemplateValues({ ...defaults, calculationRatePercent: "1,5" });
 
     expect(values.supervisionAmountUah).toBe("2 657,03");
-    expect(values.supervisionAmountInWords).toBe("Дві тисячі шістсот п’ятдесят сім грн 03 коп.");
+    expect(values.supervisionAmountInWords).toBe("Дві тисячі шістсот п'ятдесят сім гривень 03 копійки");
     expect(values.chapters1To9Expression).toBe("177 135,00 х 1,5%");
   });
 });

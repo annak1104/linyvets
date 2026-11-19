@@ -40,6 +40,7 @@ function documentText(buffer: Buffer): string {
   return documentXml(buffer)
     .replace(/<[^>]+>/g, "")
     .replace(/&#x2019;/g, "’")
+    .replace(/&apos;/g, "'")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">");
@@ -112,7 +113,7 @@ describe("official order Docxtemplater template", () => {
     expect(xml).not.toContain("{{");
     expect(text).toContain("Новий об’єкт благоустрою");
     expect(text).toContain("197,271");
-    expect(text).toContain("Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.");
+    expect(text).toContain("Сто дев'яносто сім тисяч двісті сімдесят одна гривня 00 копійок");
     expect(text).toContain("Ігор ШЕВЧУК");
     expect(text).toContain("Проєктна організація:");
     expect(text).toContain("Головний інженер проєкту: Ігор ШЕВЧУК");
@@ -172,14 +173,25 @@ describe("official order Docxtemplater template", () => {
 describe("Ukrainian currency wording", () => {
   it("converts the expected AVK amount without floating-point arithmetic", () => {
     expect(amountInWordsUkrainian("197,271")).toBe(
-      "Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.",
+      "Сто дев'яносто сім тисяч двісті сімдесят одна гривня 00 копійок",
     );
   });
 
   it("rounds only at the kopeck boundary for decimal input", () => {
     expect(amountInWordsUkrainian("197.2715")).toBe(
-      "Сто дев’яносто сім тисяч двісті сімдесят одна грн 50 коп.",
+      "Сто дев'яносто сім тисяч двісті сімдесят одна гривня 50 копійок",
     );
-    expect(amountInWordsUkrainian("0,001")).toBe("Одна грн 00 коп.");
+    expect(amountInWordsUkrainian("0,001")).toBe("Одна гривня 00 копійок");
+  });
+
+  it("keeps the thousand-UAH input and uses grammatical currency forms", () => {
+    expect(amountInWordsUkrainian("36,923")).toBe(
+      "Тридцять шість тисяч дев'ятсот двадцять три гривні 00 копійок",
+    );
+    expect(amountInWordsUkrainian("1")).toBe("Одна тисяча гривень 00 копійок");
+    expect(amountInWordsUkrainian("0")).toBe("Нуль гривень 00 копійок");
+    expect(amountInWordsUkrainian("1,001")).toBe("Одна тисяча одна гривня 00 копійок");
+    expect(amountInWordsUkrainian("1,00201")).toBe("Одна тисяча дві гривні 01 копійка");
+    expect(amountInWordsUkrainian("1000")).toContain("мільйон гривень");
   });
 });

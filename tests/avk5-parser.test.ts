@@ -49,6 +49,20 @@ describe("parseAvk5Estimate", () => {
     ]));
   });
 
+  it("keeps a decimal-comma consolidated total in thousands of UAH", async () => {
+    const source = readFileSync(fixturePath, "latin1").replaceAll("197,271", "36,923");
+    const result = await parseAvk5Estimate(source);
+
+    expect(result.data.finalEstimatedTotalThousandsUah).toBe(36.923);
+    expect(result.data.finalEstimatedTotalThousandsUahText).toBe("36,923");
+    expect(result.verification).toMatchObject({
+      status: "verified",
+      summaryTotalThousandsUah: 36.923,
+      estimateTableTotalThousandsUah: 36.923,
+      explanatoryTotalThousandsUah: 36.923,
+    });
+  });
+
   it("keeps the second consolidated fixture separate from the 197.271 source", async () => {
     const result = await parseAvk5Estimate(readFileSync(secondFixturePath));
 
@@ -141,6 +155,23 @@ describe("parseAvk5Estimate", () => {
     ]));
     expect(result.warnings).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: "AMBIGUOUS_FINAL_TOTAL" }),
+    ]));
+  });
+
+  it("does not select a consolidated total when authoritative sections disagree", async () => {
+    const source = readFileSync(fixturePath, "latin1");
+    const firstAmountIndex = source.indexOf("197,271");
+    const summaryAmountIndex = source.indexOf("197,271", firstAmountIndex + "197,271".length);
+    expect(firstAmountIndex).toBeGreaterThanOrEqual(0);
+    expect(summaryAmountIndex).toBeGreaterThanOrEqual(0);
+    const conflicting = `${source.slice(0, summaryAmountIndex)}198,271${source.slice(summaryAmountIndex + "197,271".length)}`;
+
+    const result = await parseAvk5Estimate(conflicting);
+
+    expect(result.data.finalEstimatedTotalThousandsUah).toBeNull();
+    expect(result.verification.status).toBe("mismatch");
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "INCONSISTENT_TOTALS" }),
     ]));
   });
 

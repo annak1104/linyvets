@@ -58,7 +58,7 @@ function ReviewHarness({ emptyRequiredFields = false, mappedSource = false, onSu
       ...emptyOrderValues,
       projectName: emptyRequiredFields ? "" : parseResult.data.projectName ?? "",
       estimatedAmountThousandsUah: emptyRequiredFields ? "" : "197,271",
-      estimatedAmountInWords: emptyRequiredFields ? "" : "Сто дев’яносто сім тисяч двісті сімдесят одна грн 00 коп.",
+      estimatedAmountInWords: emptyRequiredFields ? "" : "Сто дев'яносто сім тисяч двісті сімдесят одна гривня 00 копійок",
       projectOrganization: mappedSource ? "Ігор ШЕВЧУК" : "",
       chiefProjectEngineer: parseResult.data.chiefProjectEngineer ?? "",
     },
@@ -103,10 +103,21 @@ describe("ReviewEditStep", () => {
     fireEvent.change(amount, { target: { value: "200" } });
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("Двісті тисяч грн 00 коп.")).toBeTruthy();
+      expect(screen.getByDisplayValue("Двісті тисяч гривень 00 копійок")).toBeTruthy();
       expect(screen.getByDisplayValue(/в сумі 200 тис\. грн\./)).toBeTruthy();
       expect(screen.getByText("Змінено вручну").classList.contains("bg-cream")).toBe(true);
       expect(screen.getAllByText(/200/).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("keeps decimal thousand-UAH input in the preview and recalculates its wording", async () => {
+    render(<ReviewHarness />);
+
+    fireEvent.change(screen.getByLabelText(/Сума, тис\. грн/), { target: { value: "36,923" } });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Тридцять шість тисяч дев'ятсот двадцять три гривні 00 копійок")).toBeTruthy();
+      expect(screen.getByDisplayValue(/в сумі 36,923 тис\. грн\./)).toBeTruthy();
     });
   });
 

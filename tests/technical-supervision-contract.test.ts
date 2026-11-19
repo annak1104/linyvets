@@ -20,7 +20,7 @@ describe("technical supervision contract", () => {
     expect(defaults.projectName).toBe("Поточний ремонт зупинки громадського транспорту \"Мостозагін\", що на вул.Ківерцівська,біля будинку 9б (непарна сторона) в місті Луцьку Волинської області");
     expect(defaults.calculationRatePercent).toBe("1,1");
     expect(defaults.supervisionAmountUah).toBe("1 948,49");
-    expect(defaults.supervisionAmountInWords).toBe("Одна тисяча дев’ятсот сорок вісім грн 49 коп.");
+    expect(defaults.supervisionAmountInWords).toBe("Одна тисяча дев'ятсот сорок вісім гривень 49 копійок");
     expect(defaults.customerDetails).toContain("Департамент житлово-комунального господарства Луцької міської ради");
     expect(defaults.customerDetails).toContain("р/р №");
     expect(defaults.contractorDetails).toContain("ФОП Шевчук Ігор Вікторович");
@@ -163,7 +163,7 @@ describe("technical supervision contract", () => {
     const templateValues = buildTechnicalSupervisionContractTemplateValues(values);
 
     expect(templateValues.supervisionAmountUah).toBe("2 657,03");
-    expect(templateValues.supervisionAmountInWords).toBe("Дві тисячі шістсот п’ятдесят сім грн 03 коп.");
+    expect(templateValues.supervisionAmountInWords).toBe("Дві тисячі шістсот п'ятдесят сім гривень 03 копійки");
     expect(templateValues.chapters1To9TotalUah).toBe("177 135,00");
     expect(templateValues.contractNumber).toBe("01/26");
     expect(templateValues.contractorSignature).toBe("Підпис виконавця");
