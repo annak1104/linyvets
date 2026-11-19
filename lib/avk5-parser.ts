@@ -135,6 +135,7 @@ const APPROVAL_SUMMARY_LABEL = "Зведений кошторисний розр
 const ESTIMATE_TOTAL_LABEL = "Всього по зведеному кошторисному розрахунку";
 const THOUSANDS_AMOUNT_PATTERN = String.raw`\d{1,3}(?:[ .]\d{3})*(?:[.,]\d{1,3})?`;
 const TABLE_AMOUNT_PATTERN = String.raw`\d{1,3}(?:\.\d{3})*(?:,\d{1,3})?`;
+const DEFAULT_RTF_UNICODE_FALLBACK_COUNT = 1;
 
 /**
  * Parse an AVK-5 estimate from its original RTF bytes.
@@ -177,11 +178,141 @@ export function normalizeRtfForParser(input: Buffer | Uint8Array | string): stri
     normalized = normalized.replace(/\{\\fonttbl\{/, "{\\fonttbl{\\f0\\fnil\\fcharset204 Arial;}{");
   }
 
+  normalized = stripUnicodeFallbacks(normalized);
+
   // Keep the RTF control syntax ASCII and turn raw CP1251 text bytes into
   // standard RTF hex escapes. This preserves exact decoded source text.
   return Array.from(Buffer.from(normalized, "latin1"), (byte) => byte >= 0x80
     ? `\\'${byte.toString(16).padStart(2, "0")}`
     : String.fromCharCode(byte)).join("");
+}
+
+type RtfControlToken = {
+  name: string;
+  parameter: number | null;
+  end: number;
+};
+
+function readRtfControlToken(value: string, start: number): RtfControlToken | null {
+  if (value[start] !== "\\") return null;
+  let index = start + 1;
+  const nameStart = index;
+  while (index < value.length && /[A-Za-z]/.test(value[index])) index += 1;
+  if (index === nameStart) return null;
+
+  const parameterStart = index;
+  if (value[index] === "-") index += 1;
+  while (index < value.length && /\d/.test(value[index])) index += 1;
+  const parameterText = value.slice(parameterStart, index);
+  const parameter = parameterText && parameterText !== "-" ? Number(parameterText) : null;
+  if (value[index] === " ") index += 1;
+
+  return { name: value.slice(nameStart, parameterStart), parameter, end: index };
+}
+
+function isValidRtfUnicodeValue(value: number | null): value is number {
+  return value !== null && Number.isInteger(value) && value >= -32768 && value <= 32767;
+}
+
+function skipRtfFallbackToken(value: string, start: number): number | null {
+  if (value[start] !== "\\") return null;
+  const next = value[start + 1];
+  if (next === "'" && /^[0-9a-f]{2}$/i.test(value.slice(start + 2, start + 4))) return start + 4;
+  if (next === "\\" || next === "{" || next === "}" || next === "~" || next === "-" || next === "_") return start + 2;
+  return null;
+}
+
+function preserveRtfTextAfterUnicode(value: string, index: number, output: string[]): number {
+  if (value[index] === " ") {
+    output.push("\\~");
+    return index + 1;
+  }
+  if (value[index] !== "\\" && value[index] !== "{" && value[index] !== "}" && value[index] !== "\r" && value[index] !== "\n") {
+    output.push(" ");
+  }
+  return index;
+}
+
+/**
+ * Removes only the fallback representation belonging to an RTF Unicode
+ * escape. Ordinary hex escapes remain untouched. RTF groups inherit \uc,
+ * while changes to it are scoped to the current group.
+ */
+function stripUnicodeFallbacks(value: string): string {
+  const output: string[] = [];
+  const unicodeFallbackStack = [DEFAULT_RTF_UNICODE_FALLBACK_COUNT];
+  let fallbackToSkip = 0;
+
+  for (let index = 0; index < value.length;) {
+    const character = value[index];
+
+    if (character === "{") {
+      fallbackToSkip = 0;
+      output.push(character);
+      unicodeFallbackStack.push(unicodeFallbackStack.at(-1) ?? DEFAULT_RTF_UNICODE_FALLBACK_COUNT);
+      index += 1;
+      continue;
+    }
+    if (character === "}") {
+      fallbackToSkip = 0;
+      output.push(character);
+      if (unicodeFallbackStack.length > 1) unicodeFallbackStack.pop();
+      index += 1;
+      continue;
+    }
+
+    if (fallbackToSkip > 0) {
+      if (character === "\\") {
+        const fallbackEnd = skipRtfFallbackToken(value, index);
+        if (fallbackEnd !== null) {
+          fallbackToSkip -= 1;
+          index = fallbackEnd;
+          if (fallbackToSkip === 0) index = preserveRtfTextAfterUnicode(value, index, output);
+          continue;
+        }
+        fallbackToSkip = 0;
+      } else {
+        fallbackToSkip -= 1;
+        index += 1;
+        if (fallbackToSkip === 0) index = preserveRtfTextAfterUnicode(value, index, output);
+        continue;
+      }
+    }
+
+    if (character !== "\\") {
+      output.push(character);
+      index += 1;
+      continue;
+    }
+
+    const token = readRtfControlToken(value, index);
+    if (!token) {
+      output.push(character);
+      index += 1;
+      continue;
+    }
+
+    if (token.name.toLowerCase() === "uc" && token.parameter !== null && token.parameter >= 0) {
+      unicodeFallbackStack[unicodeFallbackStack.length - 1] = token.parameter;
+      output.push(value.slice(index, token.end));
+      index = token.end;
+      continue;
+    }
+
+    if (token.name.toLowerCase() === "u") {
+      if (isValidRtfUnicodeValue(token.parameter)) {
+        output.push(value.slice(index, token.end));
+        fallbackToSkip = unicodeFallbackStack.at(-1) ?? DEFAULT_RTF_UNICODE_FALLBACK_COUNT;
+      }
+      index = token.end;
+      continue;
+    }
+
+    output.push(value.slice(index, token.end));
+    index = token.end;
+  }
+
+  return output.join("");
 }
 
 async function parseDocument(normalizedRtf: string): Promise<RtfDocument> {
@@ -567,7 +698,7 @@ function decodeRtfFragment(fragment: string): string {
       continue;
     }
     if (next === "u") {
-      const match = fragment.slice(index).match(/^\\u(-?\d+)\??/);
+      const match = fragment.slice(index).match(/^\\u(-?\d+)/);
       if (match) {
         flushBytes();
         const codePoint = Number(match[1]);

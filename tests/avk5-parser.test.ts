@@ -1,14 +1,63 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseAvk5Estimate } from "@/lib/avk5-parser";
+import { extractRtfTableRows, normalizeRtfForParser, parseAvk5Estimate } from "@/lib/avk5-parser";
 
 const fixturePath = resolve(process.cwd(), "reference/6_КД_ЗКР.rtf");
 const secondFixturePath = resolve(process.cwd(), "reference/10_КД_ЗКР.rtf");
 const localFixturePath = resolve(process.cwd(), "reference/8_КД_ЛК1_02-01-01.rtf");
 const longProjectFixturePath = resolve(process.cwd(), "reference/67_КД_ЗКР.rtf");
+const libreOfficeFixturePath = "/Users/andriinakonechnyi/Downloads/25_КД_ЗКР.rtf";
 
 describe("parseAvk5Estimate", () => {
+  it("removes Unicode fallback tokens while preserving ordinary hex escapes", () => {
+    const rtf = String.raw`{\rtf1\ansi\uc1 \u1047\'c7 ordinary \'e0\par}`;
+    const normalized = normalizeRtfForParser(rtf);
+
+    expect(normalized).toContain(String.raw`\u1047`);
+    expect(normalized).not.toContain(String.raw`\u1047\'c7`);
+    expect(normalized).toContain(String.raw`ordinary \'e0`);
+  });
+
+  it("uses the default and explicit Unicode fallback lengths", () => {
+    const missingUc = normalizeRtfForParser(String.raw`{\rtf1\ansi \u1047\'c7}`);
+    const explicitTwo = normalizeRtfForParser(String.raw`{\rtf1\ansi\uc2 \u1047\'c7\'d0}`);
+    const explicitZero = normalizeRtfForParser(String.raw`{\rtf1\ansi\uc0 \u1047\'c7}`);
+
+    expect(missingUc).not.toContain(String.raw`\'c7`);
+    expect(explicitTwo).not.toContain(String.raw`\'c7`);
+    expect(explicitTwo).not.toContain(String.raw`\'d0`);
+    expect(explicitZero).toContain(String.raw`\u1047\'c7`);
+  });
+
+  it("decodes Unicode table-cell labels without duplicating fallback text", () => {
+    const rtf = String.raw`{\rtf1\ansi\uc1\trowd\pard \u1047\'c7\cell\pard 357,880\cell\row}`;
+    const rows = extractRtfTableRows(normalizeRtfForParser(rtf));
+
+    expect(rows[0]?.cells[0]).toContain("З");
+    expect(rows[0]?.cells[0]).not.toContain("ЗЗ");
+    expect(rows[0]?.cells[1]).toContain("357,880");
+  });
+
+  it("does not throw on malformed Unicode values", () => {
+    expect(() => normalizeRtfForParser(String.raw`{\rtf1\ansi\uc1 \u999999\'c7}`)).not.toThrow();
+  });
+
+  it("extracts the supplied LibreOffice RTF when available", async () => {
+    if (!existsSync(libreOfficeFixturePath)) return;
+
+    const result = await parseAvk5Estimate(readFileSync(libreOfficeFixturePath));
+
+    expect(result.extractionStatus).toBe("extracted");
+    expect(result.data.documentType).toBe("consolidated-estimate");
+    expect(result.data.projectName).toContain("Поточний ремонт зупинки громадського транспорту \"Вулиця Садова\"");
+    expect(result.data.finalEstimatedTotalThousandsUah).toBe(357.88);
+    expect(result.data.finalEstimatedTotalThousandsUahText).toBe("357,880");
+    expect(result.data.projectOrganization).toBe("Ігор ШЕВЧУК");
+    expect(result.data.chiefProjectEngineer).toBe("Ігор ШЕВЧУК");
+    expect(result.data.preparedBy).toBe("Ігор ШЕВЧУК");
+  });
+
   it("extracts exact values and evidence from the real CP1251 fixture", async () => {
     const result = await parseAvk5Estimate(readFileSync(fixturePath));
 
